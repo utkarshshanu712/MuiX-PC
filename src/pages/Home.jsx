@@ -617,7 +617,7 @@ const Home = ({ onSongSelect, username }) => {
         <Box sx={{ 
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-          gap: 1.5,
+          gap: { xs: 1.5, md: 11 },
           maxWidth: '100%',
           overflowX: 'hidden',
         }}>
