@@ -1,0 +1,146 @@
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  position: fixed;
+  font-size: 16px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #121212;
+  color: white;
+}
+
+/* Mobile-optimized scrolling */
+.scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  width: 100%;
+  padding-bottom: env(safe-area-inset-bottom, 90px);
+}
+
+/* Mobile touch targets */
+button, 
+[role="button"],
+.clickable {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px;
+  touch-action: manipulation;
+}
+
+/* Mobile text optimization */
+@media (max-width: 600px) {
+  html {
+    font-size: 14px;
+  }
+  
+  .MuiTypography-h4 {
+    font-size: 1.5rem !important;
+  }
+  
+  .MuiTypography-h5 {
+    font-size: 1.25rem !important;
+  }
+  
+  .MuiTypography-h6 {
+    font-size: 1.1rem !important;
+  }
+  
+  .MuiTypography-body1 {
+    font-size: 0.9rem !important;
+  }
+  
+  .MuiTypography-body2 {
+    font-size: 0.8rem !important;
+  }
+}
+
+/* Mobile grid optimization */
+@media (max-width: 600px) {
+  .MuiGrid-root {
+    padding: 4px !important;
+  }
+  
+  .MuiGrid-item {
+    padding: 4px !important;
+  }
+  
+  .MuiCard-root {
+    margin-bottom: 8px;
+  }
+}
+
+/* Mobile card styles */
+.MuiCard-root {
+  background-color: #282828 !important;
+  transition: background-color 0.3s ease;
+}
+
+.MuiCard-root:active {
+  background-color: #383838 !important;
+}
+
+/* Safe area handling */
+.content-wrapper {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 90px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
