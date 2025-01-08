@@ -12,7 +12,7 @@ export const useSettings = () => {
 };
 
 export const SettingsProvider = ({ children }) => {
-  const [streamingQuality, setStreamingQuality] = useLocalStorage('streamingQuality', '160kbps');
+  const [streamingQuality, setStreamingQuality] = useLocalStorage('streamingQuality', '320kbps');
   const [downloadQuality, setDownloadQuality] = useLocalStorage('downloadQuality', '320kbps');
 
   const qualityOptions = [

@@ -213,10 +213,12 @@ const Player = ({
   const handleTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
     if (audio && !isNaN(audio.currentTime)) {
-      setCurrentTime(audio.currentTime);
-      if (!isNaN(audio.duration)) {
-        setDuration(audio.duration);
-      }
+      requestAnimationFrame(() => {
+        setCurrentTime(audio.currentTime);
+        if (!isNaN(audio.duration)) {
+          setDuration(audio.duration);
+        }
+      });
     }
   }, []);
 
@@ -225,8 +227,18 @@ const Player = ({
     if (audio && !isNaN(audio.duration) && audio.duration > 0) {
       const newTime = (newValue / 100) * audio.duration;
       if (!isNaN(newTime) && isFinite(newTime) && newTime >= 0 && newTime <= audio.duration) {
+        setCurrentTime(newTime); // Update UI immediately
         audio.currentTime = newTime;
-        setCurrentTime(newTime);
+      }
+    }
+  }, []);
+
+  const handleSliderChangeCommitted = useCallback((_, newValue) => {
+    const audio = audioRef.current;
+    if (audio && !isNaN(audio.duration) && audio.duration > 0) {
+      const newTime = (newValue / 100) * audio.duration;
+      if (!isNaN(newTime) && isFinite(newTime) && newTime >= 0 && newTime <= audio.duration) {
+        audio.currentTime = newTime;
       }
     }
   }, []);
@@ -440,35 +452,76 @@ const Player = ({
 
   const playerControls = useMemo(
     () => (
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <IconButton
-          onClick={handlePrevious}
-          disabled={!hasPrevious}
-          sx={{ color: "white" }}
-        >
-          <SkipPrevious />
-        </IconButton>
-        <IconButton
-          onClick={handlePlayPause}
-          disabled={!currentTrack}
-          sx={{
-            color: "white",
-            bgcolor: "primary.main",
-            "&:hover": { bgcolor: "primary.dark" },
-          }}
-        >
-          {isPlaying ? <Pause /> : <PlayArrow />}
-        </IconButton>
-        <IconButton
-          onClick={handleNext}
-          disabled={!hasNext}
-          sx={{ color: "white" }}
-        >
-          <SkipNext />
-        </IconButton>
+      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+          <IconButton
+            onClick={handlePrevious}
+            disabled={!hasPrevious}
+            sx={{ color: "white" }}
+          >
+            <SkipPrevious />
+          </IconButton>
+          <IconButton
+            onClick={handlePlayPause}
+            disabled={!currentTrack}
+            sx={{
+              color: "white",
+              bgcolor: "primary.main",
+              "&:hover": { bgcolor: "primary.dark" },
+            }}
+          >
+            {isPlaying ? <Pause /> : <PlayArrow />}
+          </IconButton>
+          <IconButton
+            onClick={handleNext}
+            disabled={!hasNext}
+            sx={{ color: "white" }}
+          >
+            <SkipNext />
+          </IconButton>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", width: "100%", gap: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 35 }}>
+            {formatTime(currentTime)}
+          </Typography>
+          <Slider
+            value={(currentTime / duration) * 100 || 0}
+            onChange={handleSliderChange}
+            onChangeCommitted={handleSliderChangeCommitted}
+            aria-label="Progress"
+            sx={{
+              color: "white",
+              height: 4,
+              '& .MuiSlider-thumb': {
+                width: 8,
+                height: 8,
+                transition: '0.3s cubic-bezier(.47,1.64,.41,.8)',
+                '&:before': {
+                  boxShadow: '0 2px 12px 0 rgba(0,0,0,0.4)',
+                },
+                '&:hover, &.Mui-focusVisible': {
+                  boxShadow: '0px 0px 0px 8px rgba(255, 255, 255, 0.16)',
+                },
+                '&.Mui-active': {
+                  width: 12,
+                  height: 12,
+                },
+              },
+              '& .MuiSlider-rail': {
+                opacity: 0.28,
+              },
+              '& .MuiSlider-track': {
+                transition: 'width 0.1s linear',
+              },
+            }}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 35 }}>
+            {formatTime(duration)}
+          </Typography>
+        </Box>
       </Box>
     ),
-    [isPlaying, hasNext, hasPrevious, error]
+    [isPlaying, hasNext, hasPrevious, currentTime, duration, error]
   );
 
   const trackControls = useMemo(

@@ -164,6 +164,31 @@ const ExpandedPlayer = ({
     return { startIndex: 0, endIndex: linesPerGroup, currentLine: 0 };
   };
 
+  const [sliderValue, setSliderValue] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (!isDragging) {
+      setSliderValue((currentTime / duration) * 100 || 0);
+    }
+  }, [currentTime, duration, isDragging]);
+
+  const handleSliderChange = (_, newValue) => {
+    setSliderValue(newValue);
+    const newTime = (newValue / 100) * duration;
+    if (!isNaN(newTime) && isFinite(newTime)) {
+      onTimeChange(_, newValue);
+    }
+  };
+
+  const handleSliderDragStart = () => {
+    setIsDragging(true);
+  };
+
+  const handleSliderDragEnd = () => {
+    setIsDragging(false);
+  };
+
   const playerControls = useMemo(() => (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -198,21 +223,47 @@ const ExpandedPlayer = ({
         </Typography>
         <Slider
           size="small"
-          value={currentTime}
-          max={duration}
-          onChange={onTimeChange}
+          value={sliderValue}
+          max={100}
+          onChange={handleSliderChange}
+          onMouseDown={handleSliderDragStart}
+          onMouseUp={handleSliderDragEnd}
+          onTouchStart={handleSliderDragStart}
+          onTouchEnd={handleSliderDragEnd}
           sx={{
-            color: 'white',
+            color: '#1db954',
+            height: 4,
+            padding: '15px 0',
             '& .MuiSlider-thumb': {
               width: 12,
               height: 12,
+              backgroundColor: '#fff',
+              transition: '0.2s cubic-bezier(.47,1.64,.41,.8)',
+              '&:before': {
+                boxShadow: '0 2px 12px 0 rgba(0,0,0,0.4)',
+              },
               '&:hover, &.Mui-focusVisible': {
-                boxShadow: '0px 0px 0px 8px rgba(255, 255, 255, 0.16)'
-              }
+                boxShadow: '0px 0px 0px 8px rgba(255, 255, 255, 0.16)',
+                width: 16,
+                height: 16,
+              },
+              '&.Mui-active': {
+                width: 16,
+                height: 16,
+              },
+              '&.Mui-disabled': {
+                cursor: 'not-allowed',
+              },
             },
             '& .MuiSlider-rail': {
-              opacity: 0.28
-            }
+              opacity: 0.28,
+              backgroundColor: '#ffffff40',
+            },
+            '& .MuiSlider-track': {
+              border: 'none',
+              transition: 'all 0.1s linear',
+              backgroundColor: '#1db954',
+            },
           }}
         />
         <Typography sx={{ color: 'text.secondary', ml: 1, minWidth: 35 }}>
@@ -220,7 +271,7 @@ const ExpandedPlayer = ({
         </Typography>
       </Box>
     </Box>
-  ), [currentTime, duration, isPlaying, hasNext, hasPrevious, onNext, onPrevious, onPlayPause, onQueueClick, onTimeChange]);
+  ), [sliderValue, duration, isPlaying, hasNext, hasPrevious, onNext, onPrevious, onPlayPause, onQueueClick, isDragging]);
 
   const handleSleepTimerClick = (event) => {
     setSleepTimerAnchor(event.currentTarget);
