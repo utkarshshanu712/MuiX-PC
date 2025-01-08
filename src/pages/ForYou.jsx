@@ -3,7 +3,7 @@ import { Box, Typography, IconButton, CircularProgress, Chip, Stack, Menu, MenuI
 import { 
   Favorite, FavoriteBorder, PlayArrow, Pause, 
   PlaylistAdd, ArrowBack, Timer, MoreVert,
-  Language 
+  Language, CheckBox, CheckBoxOutlineBlank, Download 
 } from '@mui/icons-material';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,7 +11,6 @@ import { useSwipeable } from 'react-swipeable';
 import { useNavigate } from 'react-router-dom';
 import { useLibrary } from '../contexts/LibraryContext';
 import { useSettings } from '../contexts/SettingsContext';
-import { useUserPreferences } from '../contexts/UserPreferencesContext';
 
 const categories = [
   {
@@ -34,32 +33,32 @@ const categories = [
       'A. R. Rahman', 'Mohit Chauhan', 'Sunidhi Chauhan', 'Kumar Sanu', 'Alka Yagnik',
       'Udit Narayan', 'Sonu Nigam', 'Shankar Mahadevan', 'Kailash Kher', 'Javed Ali',
       'KK', 'Rahat Fateh Ali Khan', 'Mika Singh', 'Himesh Reshammiya', 'Yo Yo Honey Singh',
-      'Badshah', 'Diljit Dosanjh', 'Guru Randhawa', 'Neha Kakkar',
-            'Featured Playlists', 'Recommended for today', 'trending songs', 'popular songs', 'top charts', 'Mix',
-            'new releases', 'hot tracks', 'top hits', 'latest songs', 'music mix', 'best of the week',
-            'editors picks', 'recommended for you', 'must-listen', 'top 100 songs',
-            'Pyaar', 'Dil', 'Dard', 'Ishq', 'Mohabbat', 'Judaai', 'Bewafa', 'Dhoka',
-            'Yaadein', 'Intezaar', 'Tanhai', 'Romantic', 'Love Songs Hindi', 'Hindi Hits',
-            'Bollywood Romance', 'Hindi Love Mix', 'Sad Love Songs Hindi', 'Bollywood', 'Hindi', 'Indian', 'Desi',
-            'Bollywood Hits', 'Hindi Songs', 'Indian Music', 'Desi Music', 'Bollywood Music', 'Hindi Music',
-            'Arijit Singh', 'Shreya Ghoshal', 'Atif Aslam', 'A. R. Rahman', 'Mohit Chauhan',
-            'Sunidhi Chauhan', 'Kumar Sanu', 'Alka Yagnik', 'Udit Narayan', 'Sonu Nigam',
-            'Shankar Mahadevan', 'Kailash Kher', 'Javed Ali', 'KK', 'Rahat Fateh Ali Khan',
-            'Mika Singh', 'Himesh Reshammiya', 'Yo Yo Honey Singh', 'Badshah', 'Diljit Dosanjh',
-            'Guru Randhawa', 'Neha Kakkar', 'Sukhwinder Singh', 'Amit Trivedi', 'Shankar Ehsaan Loy',
-            'Shan', 'Ankit Tiwari', 'Armaan Malik', 'Benny Dayal', 'Jubin Nautiyal',
-            'Nakash Aziz', 'Sukhwinder Singh', 'Vishal-Shekhar', 'Pritam', 'Mithoon',
-            'Salim-Sulaiman', 'Ajay-Atul', 'Sachin-Jigar', 'Akhil', 'Jasleen Royal', 
-            'Harshdeep Kaur', 'Shalmali Kholgade', 'Tulsi Kumar', 'Palak Muchhal', 'Neeti Mohan', 
-            'Shaan', 'Sneha Khanwalkar', 'Aditi Singh Sharma', 'Aastha Gill', 'Neha Bhasin', 
-            'Monali Thakur', 'Richa Sharma', 'Jonita Gandhi', 'Kanika Kapoor', 'Hard Kaur', 
-            'Anusha Mani', 'Anushka Manchanda', 'Dhvani Bhanushali', 'Pawni Pandey', 'Kavita Seth', 
-            'Ananya Birla', 'Akasa Singh', 'Ritviz', 'Badshah', 'Bohemia', 'Raftaar', 'DIVINE', 
-            'Nucleya', 'Prabh Deep', 'Emiway Bantai', 'Naezy', 'Brodha V', 'KRSNA', 'MC Stan', 
-            'Kaam Bhari', 'Seedhe Maut', 'Ikka', 'Bali', 'Karma'
-          ]
-        },
-        
+      'Badshah', 'Diljit Dosanjh', 'Guru Randhawa', 'Neha Kakkar','Pawan Singh latest song', 'Pawan Singh new song 2024', 'Pawan Singh trending',
+    'Khesari Lal new song 2024', 'Khesari Lal Yadav latest', 'Khesari Lal hit song',
+    'Kallu new song 2024', 'Kallu latest songs', 'Kallu hit songs',
+    'Ritesh Pandey new 2024', 'Ritesh Pandey latest', 'Ritesh Pandey hits',
+    'Arvind Akela Kallu 2024', 'Arvind Akela new song', 'Arvind Akela hits',
+    'new bhojpuri songs 2024', 'latest bhojpuri songs', 'top bhojpuri songs',
+    'bhojpuri hit songs 2024', 'bhojpuri viral songs', 'bhojpuri trending songs',
+    'bhojpuri dj songs 2024', 'bhojpuri remix songs', 'bhojpuri party songs',
+    'bhojpuri romantic songs', 'bhojpuri love songs', 'bhojpuri sad songs',
+    'bhojpuri album songs', 'bhojpuri film songs', 'bhojpuri movie songs',
+    'bhojpuri stage show', 'bhojpuri live show', 'bhojpuri dance songs',
+    'Pramod Premi new song', 'Ankush Raja latest', 'Shilpi Raj new song',
+    'Gunjan Singh latest', 'Samar Singh new song', 'Neelkamal Singh latest','punjabi songs', 'latest punjabi songs', 'punjabi hits', 'new punjabi songs',
+    'popular punjabi songs', 'trending punjabi songs', 'punjabi party songs',
+    'punjabi folk songs', 'punjabi pop songs', 'punjabi viral songs',
+    'punjabi bhangra', 'punjabi trending', 'punjabi popular', 'punjabi new releases',    'hindi songs', 'bollywood songs', 'latest hindi songs', 'hindi hits',
+    'bollywood hits', 'hindi top songs', 'new hindi songs', 'popular hindi songs',
+    'trending hindi songs', 'hindi romantic songs', 'hindi party songs',
+    'hindi classics', 'old hindi songs', 'hindi film songs', 'hindi movie songs',
+    'hindi pop songs', 'hindi indie songs', 'hindi viral songs',
+    'hindi trending', 'hindi popular', 'hindi new releases',    'rajasthani songs', 'latest rajasthani songs', 'rajasthani hits',
+    'new rajasthani songs', 'popular rajasthani songs', 'trending rajasthani songs',
+    'rajasthani folk songs', 'rajasthani pop songs', 'rajasthani viral songs',
+    'rajasthani trending', 'rajasthani popular', 'rajasthani new releases'
+    ]
+  },
   {
     name: 'Chill',
     color: '#4A90E2',
@@ -104,7 +103,7 @@ const categories = [
       'Mohabbat', 'Judaai', 'Bewafa', 'Dhoka', 'Yaadein', 'Intezaar', 'Tanhai',
       'Bichadna', 'Alvida', 'Tanha', 'Tadap', 'Intezaar', 'Bepanah', 'Dard Bhare Geet',
       'Rona', 'Aansu', 'Bichhadna', 'Alvida', 'Tanhai', 'Tadap', 'Intezaar', 'Bepanah',
-      , 'Haryanvi Emotional Songs',  'Haryanvi Judaai'
+      , 'Haryanvi Emotional Songs',  'Haryanvi Judaai',
     ]
   },
   {
@@ -134,6 +133,55 @@ const categories = [
   }
 ];
 
+const languageQueries = {
+  hindi: [
+    'hindi songs', 'bollywood songs', 'latest hindi songs', 'hindi hits',
+    'bollywood hits', 'hindi top songs', 'new hindi songs', 'popular hindi songs',
+    'trending hindi songs', 'hindi romantic songs', 'hindi party songs',
+    'hindi classics', 'old hindi songs', 'hindi film songs', 'hindi movie songs',
+    'hindi pop songs', 'hindi indie songs', 'hindi viral songs',
+    'hindi trending', 'hindi popular', 'hindi new releases'
+  ],
+  punjabi: [
+    'punjabi songs', 'latest punjabi songs', 'punjabi hits', 'new punjabi songs',
+    'popular punjabi songs', 'trending punjabi songs', 'punjabi party songs',
+    'punjabi folk songs', 'punjabi pop songs', 'punjabi viral songs',
+    'punjabi bhangra', 'punjabi trending', 'punjabi popular', 'punjabi new releases'
+  ],
+  bhojpuri: [
+    'Pawan Singh latest song', 'Pawan Singh new song 2024', 'Pawan Singh trending',
+    'Khesari Lal new song 2024', 'Khesari Lal Yadav latest', 'Khesari Lal hit song',
+    'Kallu new song 2024', 'Kallu latest songs', 'Kallu hit songs',
+    'Ritesh Pandey new 2024', 'Ritesh Pandey latest', 'Ritesh Pandey hits',
+    'Arvind Akela Kallu 2024', 'Arvind Akela new song', 'Arvind Akela hits',
+    'new bhojpuri songs 2024', 'latest bhojpuri songs', 'top bhojpuri songs',
+    'bhojpuri hit songs 2024', 'bhojpuri viral songs', 'bhojpuri trending songs',
+    'bhojpuri dj songs 2024', 'bhojpuri remix songs', 'bhojpuri party songs',
+    'bhojpuri romantic songs', 'bhojpuri love songs', 'bhojpuri sad songs',
+    'bhojpuri album songs', 'bhojpuri film songs', 'bhojpuri movie songs',
+    'bhojpuri stage show', 'bhojpuri live show', 'bhojpuri dance songs',
+    'Pramod Premi new song', 'Ankush Raja latest', 'Shilpi Raj new song',
+    'Gunjan Singh latest', 'Samar Singh new song', 'Neelkamal Singh latest'
+  ],
+  haryanvi: [
+    'haryanvi songs', 'latest haryanvi songs', 'haryanvi hits', 'new haryanvi songs',
+    'popular haryanvi songs', 'trending haryanvi songs', 'haryanvi folk songs',
+    'haryanvi pop songs', 'haryanvi viral songs', 'haryanvi trending',
+    'haryanvi popular', 'haryanvi new releases'
+  ],
+  rajasthani: [
+    'rajasthani songs', 'latest rajasthani songs', 'rajasthani hits',
+    'new rajasthani songs', 'popular rajasthani songs', 'trending rajasthani songs',
+    'rajasthani folk songs', 'rajasthani pop songs', 'rajasthani viral songs',
+    'rajasthani trending', 'rajasthani popular', 'rajasthani new releases'
+  ]
+};
+
+const getLanguageSpecificQuery = (language) => {
+  const queries = languageQueries[language.toLowerCase()] || [];
+  return queries[Math.floor(Math.random() * queries.length)] || language;
+};
+
 const MusicCard = ({ song, isPlaying, onPlay, onNext, isLiked, onLike, isVisible, currentTime = 0, duration = 0, onSeek }) => {
   const [lyrics, setLyrics] = useState('');
   const [loading, setLoading] = useState(false);
@@ -152,7 +200,7 @@ const MusicCard = ({ song, isPlaying, onPlay, onNext, isLiked, onLike, isVisible
     const fetchLyrics = async () => {
       if (!song?.id) return;
       
-      setLoading(true);
+      setLoading(false);
       setError(null);
 
       try {
@@ -455,6 +503,25 @@ const MusicCard = ({ song, isPlaying, onPlay, onNext, isLiked, onLike, isVisible
           }}>
             Add to Favorites
           </MenuItem>
+          <MenuItem onClick={async () => {
+            try {
+              const response = await fetch(song.downloadUrl['320kbps'] || song.downloadUrl['160kbps'] || song.downloadUrl['96kbps'] || song.downloadUrl);
+              const blob = await response.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${song.name} - ${song.primaryArtists}.mp3`;
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(url);
+              document.body.removeChild(a);
+            } catch (error) {
+              console.error('Error downloading song:', error);
+            }
+            setPlaylistAnchorEl(null);
+          }}>
+            <Download sx={{ mr: 1 }} /> Download
+          </MenuItem>
           {playlists.map((playlist) => (
             <MenuItem key={playlist.id} onClick={() => {
               addToPlaylist(playlist.id, song);
@@ -476,8 +543,6 @@ const MusicCard = ({ song, isPlaying, onPlay, onNext, isLiked, onLike, isVisible
 };
 
 const ForYou = () => {
-  const { selectedLanguage, setSelectedLanguage, languages } = useUserPreferences();
-  const [languageAnchorEl, setLanguageAnchorEl] = useState(null);
   const [songs, setSongs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -493,28 +558,54 @@ const ForYou = () => {
   const [currentQuery, setCurrentQuery] = useState('');
   const [lastQuery, setLastQuery] = useState('');
   const [queryHistory, setQueryHistory] = useState([]);
+  const [selectedLanguages, setSelectedLanguages] = useState(['Hindi']);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const audioRef = useRef(new Audio());
   const { addToLibrary, removeFromLibrary, isInLibrary } = useLibrary();
   const { streamingQuality, getUrlForQuality } = useSettings();
+
+  const languages = ['Hindi', 'Punjabi', 'Bhojpuri', 'Haryanvi', 'Rajasthani'];
+
+  const handleLanguageToggle = (language) => {
+    setSelectedLanguages(prev => {
+      const newLanguages = prev.includes(language) 
+        ? prev.filter(lang => lang !== language)
+        : [...prev, language];
+      
+      // Ensure at least one language is selected
+      if (newLanguages.length === 0) {
+        return ['Hindi'];
+      }
+      return newLanguages;
+    });
+  };
+
+  useEffect(() => {
+    // Reset songs and fetch new ones when languages change
+    setSongs([]);
+    setCurrentIndex(0);
+    fetchSongs(true);
+  }, [selectedLanguages]);
+
+  const handleLanguageMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+    setShowLanguageMenu(true);
+  };
+
+  const handleLanguageMenuClose = () => {
+    setAnchorEl(null);
+    setShowLanguageMenu(false);
+  };
 
   const getRandomQuery = (categoryName) => {
     const category = categories.find(c => c.name === categoryName);
     if (!category) return '';
 
-    let queries = category.queries;
-    
-    // Filter queries based on selected language
-    if (selectedLanguage !== 'Mix') {
-      queries = queries.filter(q => 
-        q.toLowerCase().includes(selectedLanguage.toLowerCase()) ||
-        !(['hindi', 'punjabi', 'bhojpuri', 'haryanvi', 'rajasthani', 'english'].some(lang => 
-          q.toLowerCase().includes(lang)
-        ))
-      );
-    }
-
+    const queries = category.queries;
     let availableQueries = queries.filter(q => !queryHistory.includes(q));
     
+    // If all queries have been used, reset the history but keep the last query
     if (availableQueries.length === 0) {
       const lastUsedQuery = queryHistory[queryHistory.length - 1];
       setQueryHistory([lastUsedQuery]);
@@ -525,9 +616,7 @@ const ForYou = () => {
     setQueryHistory(prev => [...prev, newQuery]);
     setLastQuery(currentQuery);
     setCurrentQuery(newQuery);
-    
-    // Add language to query if not 'Mix'
-    return selectedLanguage !== 'Mix' ? `${selectedLanguage} ${newQuery}` : newQuery;
+    return newQuery;
   };
 
   const fetchSongs = async (resetSongs = false) => {
@@ -537,73 +626,98 @@ const ForYou = () => {
     if (resetSongs) {
       setLoading(true);
       setError(null);
+      setPage(1);
+      setPlayedSongs(new Set());
     }
 
     try {
-      const query = getRandomQuery(selectedCategory);
+      let baseQuery = getRandomQuery(selectedCategory);
+      
+      // Generate language-specific queries
+      if (selectedLanguages.length > 0) {
+        const languageQueries = selectedLanguages.map(lang => {
+          const specificQuery = getLanguageSpecificQuery(lang);
+          switch(lang.toLowerCase()) {
+            case 'hindi':
+              return `(${specificQuery} OR "hindi songs" OR "bollywood songs")`;
+            case 'punjabi':
+              return `(${specificQuery} OR "punjabi songs" OR "bhangra songs")`;
+            case 'bhojpuri':
+              const bhojpuriQueries = [
+                `("${specificQuery}")`,
+                `("Pawan Singh" OR "Khesari Lal" OR "Kallu" OR "Ritesh Pandey")`,
+                `("bhojpuri new song 2024" OR "bhojpuri latest")`,
+                `("bhojpuri trending" OR "bhojpuri viral")`,
+                `("bhojpuri hit song" OR "bhojpuri popular")`
+              ];
+              return bhojpuriQueries[Math.floor(Math.random() * bhojpuriQueries.length)];
+            case 'haryanvi':
+              return `(${specificQuery} OR "haryanvi songs" OR "haryanvi music")`;
+            case 'rajasthani':
+              return `(${specificQuery} OR "rajasthani songs" OR "marwari songs")`;
+            default:
+              return `"${specificQuery}"`;
+          }
+        });
+
+        const combinedQuery = languageQueries.join(' OR ');
+        baseQuery = `${baseQuery} (${combinedQuery})`;
+      }
+
       const response = await axios.get(
-        `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}&page=${resetSongs ? 1 : page}&limit=10`
+        `https://saavn.dev/api/search/songs?query=${encodeURIComponent(baseQuery)}&page=${resetSongs ? 1 : page}&limit=25`
       );
 
-      if (!response.data?.data?.results) {
-        throw new Error('No results found');
-      }
-
+      console.log('Response data:', response.data);
       const filteredSongs = response.data.data.results.filter(song => {
         if (!song || !song.id || playedSongs.has(song.id)) return false;
-
-        // Language-based filtering
-        if (selectedLanguage !== 'Mix') {
-          const songLanguage = song.language?.toLowerCase() || '';
-          const songName = (song.name || '').toLowerCase();
-          const artistName = (song.primaryArtists || '').toLowerCase();
-          const selectedLang = selectedLanguage.toLowerCase();
-          
-          // Check if song matches selected language
-          if (!songLanguage.includes(selectedLang) && 
-              !songName.includes(selectedLang) && 
-              !artistName.includes(selectedLang)) {
-            return false;
-          }
-        }
-
+        // Enhanced language matching with strict filtering
+        const songLanguage = (song.language || '').toLowerCase();
         const songName = (song.name || '').toLowerCase();
         const artistName = (song.primaryArtists || '').toLowerCase();
+        const albumName = (song.album?.name || '').toLowerCase();
 
-        const forbiddenTerms = [
-          'nursery', 'rhyme', 'kids', 'children', 'baby', 'cartoon',
-          'learning', 'education', 'school'
-        ];
+        const matchesLanguage = selectedLanguages.some(lang => {
+          const langLower = lang.toLowerCase();
+          switch(langLower) {
+            case 'bhojpuri':
+              const isBhojpuriSong = 
+                songLanguage === 'bhojpuri' || 
+                songName.includes('bhojpuri') || 
+                artistName.includes('bhojpuri');
+              
+              const popularArtists = [
+                'pawan singh', 'khesari lal', 'kallu', 'ritesh pandey',
+                'arvind akela', 'pramod premi', 'ankush raja', 'shilpi raj',
+                'gunjan singh', 'samar singh', 'neelkamal singh'
+              ];
+              
+              const isPopularArtist = popularArtists.some(artist => 
+                artistName.includes(artist) || songName.includes(artist)
+              );
+              
+              return isBhojpuriSong || isPopularArtist;
+            default:
+              return songLanguage.includes(langLower);
+          }
+        });
 
-        const isKidsSong = forbiddenTerms.some(term => 
-          songName.includes(term) || artistName.includes(term)
-        );
-
-        return !isKidsSong;
+        return matchesLanguage;
       });
 
-      const shuffledSongs = [...filteredSongs].sort(() => Math.random() - 0.5);
-
-      if (resetSongs) {
-        setSongs(shuffledSongs);
-        setCurrentIndex(0);
-        setPage(1);
-      } else {
-        setSongs(prev => [...prev, ...shuffledSongs]);
-        setPage(prev => prev + 1);
+      if (!filteredSongs || filteredSongs.length === 0) {
+        console.error('No songs found for the selected languages.');
+        setError('No songs available');
+        return;
       }
 
-      if (filteredSongs.length < 5) {
-        setTimeout(() => fetchSongs(false), 1000);
-      }
-    } catch (err) {
-      console.error('Error fetching songs:', err);
-      setError('Failed to load songs');
-      // If error occurs, try fetching with a different query
-      setTimeout(() => fetchSongs(resetSongs), 2000);
+      setSongs(filteredSongs);
+    } catch (error) {
+      console.error('Error fetching songs:', error);
+      setError('Failed to fetch songs');
     } finally {
-      setLoading(false);
       setIsFetching(false);
+      setLoading(false); // Ensure loading is set to false here
     }
   };
 
@@ -761,34 +875,6 @@ const ForYou = () => {
     };
   }, [currentIndex, songs, streamingQuality, getUrlForQuality]);
 
-  const handleLanguageClick = (event) => {
-    setLanguageAnchorEl(event.currentTarget);
-  };
-
-  const handleLanguageClose = () => {
-    setLanguageAnchorEl(null);
-  };
-
-  const handleLanguageSelect = (language) => {
-    setSelectedLanguage(language);
-    handleLanguageClose();
-    // Reset and fetch new songs when language changes
-    setPlayedSongs(new Set());
-    setSongs([]);
-    setCurrentIndex(0);
-    setPage(1);
-    fetchSongs(true);
-  };
-
-  // Reset songs when language changes
-  useEffect(() => {
-    setPlayedSongs(new Set());
-    setSongs([]);
-    setCurrentIndex(0);
-    setPage(1);
-    fetchSongs(true);
-  }, [selectedLanguage]);
-
   const handlers = useSwipeable({
     onSwipedUp: () => {
       handleNext();
@@ -811,48 +897,49 @@ const ForYou = () => {
     }
   }, [currentTrack]);
 
+  const [bhojpuriSongs, setBhojpuriSongs] = useState([]);
+
+  // Special handling for Bhojpuri songs
+  useEffect(() => {
+    if (selectedLanguages.includes('Bhojpuri')) {
+      const filteredBhojpuriSongs = [];
+      const otherSongs = [];
+      
+      songs.forEach(song => {
+        const isBhojpuri = 
+          song.language?.toLowerCase() === 'bhojpuri' ||
+          ['pawan singh', 'khesari lal', 'kallu', 'ritesh pandey',
+            'arvind akela', 'pramod premi', 'ankush raja', 'shilpi raj',
+            'gunjan singh', 'samar singh', 'neelkamal singh'].some(artist => 
+            song.primaryArtists?.toLowerCase().includes(artist) ||
+            song.name?.toLowerCase().includes(artist)
+          );
+        
+        if (isBhojpuri) {
+          filteredBhojpuriSongs.push(song);
+        } else {
+          otherSongs.push(song);
+        }
+      });
+
+      // Ensure first 5 songs are Bhojpuri
+      const firstFive = filteredBhojpuriSongs.slice(0, 5);
+      const remainingBhojpuri = filteredBhojpuriSongs.slice(5);
+      
+      // Shuffle the first five songs
+      for (let i = firstFive.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [firstFive[i], firstFive[j]] = [firstFive[j], firstFive[i]];
+      }
+
+      // Combine all songs
+      const shuffledSongs = [...firstFive, ...remainingBhojpuri, ...otherSongs];
+      setSongs(shuffledSongs);
+    }
+  }, [selectedLanguages]);
+
   return (
     <Box sx={{ height: '100vh', overflow: 'hidden', bgcolor: '#121212', position: 'relative' }}>
-      {/* Language Selector */}
-      <Box sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1000 }}>
-        <IconButton
-          onClick={handleLanguageClick}
-          sx={{
-            bgcolor: selectedLanguage !== 'Mix' ? '#1DB954' : 'rgba(255,255,255,0.1)',
-            '&:hover': { bgcolor: selectedLanguage !== 'Mix' ? '#1ed760' : 'rgba(255,255,255,0.2)' },
-          }}
-        >
-          <Language sx={{ color: 'white' }} />
-        </IconButton>
-        <Menu
-          anchorEl={languageAnchorEl}
-          open={Boolean(languageAnchorEl)}
-          onClose={handleLanguageClose}
-          PaperProps={{
-            sx: {
-              bgcolor: '#282828',
-              color: 'white',
-              maxHeight: '300px',
-            }
-          }}
-        >
-          {languages.map((lang) => (
-            <MenuItem
-              key={lang}
-              onClick={() => handleLanguageSelect(lang)}
-              selected={selectedLanguage === lang}
-              sx={{
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
-                '&.Mui-selected': { bgcolor: 'rgba(29,185,84,0.3)' },
-                minWidth: '150px'
-              }}
-            >
-              {lang}
-            </MenuItem>
-          ))}
-        </Menu>
-      </Box>
-
       {/* Categories */}
       <Stack
         direction="row"
@@ -862,7 +949,8 @@ const ForYou = () => {
           overflowX: 'auto',
           '&::-webkit-scrollbar': { display: 'none' },
           position: 'relative',
-          zIndex: 2
+          zIndex: 2,
+          alignItems: 'center'
         }}
       >
         {categories.map((category) => (
@@ -879,7 +967,46 @@ const ForYou = () => {
             }}
           />
         ))}
+        <IconButton 
+          onClick={handleLanguageMenuOpen}
+          sx={{ 
+            color: 'white',
+            bgcolor: 'rgba(255,255,255,0.1)',
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+          }}
+        >
+          <Language />
+        </IconButton>
       </Stack>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={showLanguageMenu}
+        onClose={handleLanguageMenuClose}
+        PaperProps={{
+          sx: {
+            bgcolor: '#282828',
+            maxHeight: 300,
+            width: 200
+          }
+        }}
+      >
+        {languages.map((language) => (
+          <MenuItem 
+            key={language}
+            onClick={() => handleLanguageToggle(language)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              color: 'white'
+            }}
+          >
+            {selectedLanguages.includes(language) ? <CheckBox /> : <CheckBoxOutlineBlank />}
+            <Typography>{language}</Typography>
+          </MenuItem>
+        ))}
+      </Menu>
 
       {/* Music Cards */}
       <Box {...handlers} sx={{ height: 'calc(100% - 64px)', position: 'relative', overflow: 'hidden' }}>

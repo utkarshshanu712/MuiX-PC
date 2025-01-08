@@ -17,6 +17,7 @@ import Following from './pages/Following';
 import TopPlaylists from './pages/TopPlaylists';
 import TopPlaylistDetails from './pages/TopPlaylistDetails';
 import ForYou from './pages/ForYou';
+import CreatePlaylist from './pages/CreatePlaylist';
 import { TopPlaylistsProvider } from './contexts/TopPlaylistsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { LibraryProvider } from "./contexts/LibraryContext";
@@ -333,48 +334,20 @@ function AppContent() {
               }}
             >
               <Routes>
-                <Route
-                  path="/"
-                  element={<Home onSongSelect={handleSongSelect} username={username} />}
-                />
-                <Route
-                  path="/search"
-                  element={<Search onSongSelect={handleSongSelect} />}
-                />
-                <Route
-                  path="/library"
-                  element={<Library />}
-                />
-                <Route
-                  path="/playlist/:url"
-                  element={<Playlist onSongSelect={handleSongSelect} />}
-                />
-               
-                <Route
-                  path="/liked-songs"
-                  element={<LikedSongs onSongSelect={handleSongSelect} />}
-                />
-                <Route
-                  path="/artist/:id"
-                  element={<Artist onSongSelect={handleSongSelect} />}
-                />
-                <Route
-                  path="/album/:id"
-                  element={<Album onSongSelect={handleSongSelect} />}
-                />
+                <Route path="/" element={<Home onSongSelect={handleSongSelect} username={username} />} />
+                <Route path="/for-you" element={<ForYou />} />
+                <Route path="/library" element={<Library />} />
+                <Route path="/create-playlist" element={<CreatePlaylist />} />
+                <Route path="/search" element={<Search onSongSelect={handleSongSelect} />} />
+                <Route path="/playlist/:url" element={<Playlist onSongSelect={handleSongSelect} />} />
+                <Route path="/liked-songs" element={<LikedSongs onSongSelect={handleSongSelect} />} />
+                <Route path="/artist/:id" element={<Artist onSongSelect={handleSongSelect} />} />
+                <Route path="/album/:id" element={<Album onSongSelect={handleSongSelect} />} />
                 <Route path="/top-artists" element={<TopArtists />} />
                 <Route path="/following" element={<Following />} />
                 <Route path="/top-playlists" element={<TopPlaylists />} />
-                <Route 
-                  path="/playlist/top/:id" 
-                  element={
-                    <TopPlaylistDetails 
-                      onSongSelect={handleSongSelect}
-                    />
-                  } 
-                />
+                <Route path="/playlist/top/:id" element={<TopPlaylistDetails onSongSelect={handleSongSelect} />} />
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/for-you" element={<ForYou />} />
               </Routes>
             </Box>
           </Box>
