@@ -22,6 +22,7 @@ import { SettingsProvider } from './contexts/SettingsContext';
 import { LibraryProvider } from "./contexts/LibraryContext";
 import { ArtistProvider } from './contexts/ArtistContext';
 import { AudioProvider } from './contexts/AudioContext';
+import { UserPreferencesProvider } from './contexts/UserPreferencesContext';
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
@@ -412,17 +413,19 @@ function App() {
     <Router>
       <ThemeProvider theme={darkTheme}>
         <CssBaseline />
-        <ArtistProvider>
-          <LibraryProvider>
-            <SettingsProvider>
-              <AudioProvider>
-                <TopPlaylistsProvider>
-                  <AppContent />
-                </TopPlaylistsProvider>
-              </AudioProvider>
-            </SettingsProvider>
-          </LibraryProvider>
-        </ArtistProvider>
+        <UserPreferencesProvider>
+          <ArtistProvider>
+            <LibraryProvider>
+              <SettingsProvider>
+                <AudioProvider>
+                  <TopPlaylistsProvider>
+                    <AppContent />
+                  </TopPlaylistsProvider>
+                </AudioProvider>
+              </SettingsProvider>
+            </LibraryProvider>
+          </ArtistProvider>
+        </UserPreferencesProvider>
       </ThemeProvider>
     </Router>
   );

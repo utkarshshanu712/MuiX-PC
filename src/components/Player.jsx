@@ -37,6 +37,7 @@ import ExpandedPlayer from "./ExpandedPlayer";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useLibrary } from "../contexts/LibraryContext";
 import { useSettings } from '../contexts/SettingsContext';
+import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import PlaylistMenu from "./PlaylistMenu";
 
 // Memoized Queue Item Component
@@ -170,6 +171,7 @@ const Player = ({
 }) => {
   const audioRef = useRef(new Audio());
   const { streamingQuality, downloadQuality, getUrlForQuality } = useSettings();
+  const { addToRecentlyPlayed } = useUserPreferences();
   const [volume, setVolume] = useLocalStorage("playerVolume", 1);
   const [isMuted, setIsMuted] = useLocalStorage("playerMuted", false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -364,6 +366,12 @@ const Player = ({
       audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [handleTimeUpdate]);
+
+  useEffect(() => {
+    if (currentTrack && isPlaying) {
+      addToRecentlyPlayed(currentTrack);
+    }
+  }, [currentTrack, isPlaying, addToRecentlyPlayed]);
 
   const handleQueueItemClick = useCallback((song, index) => {
     setQueuePosition(index);

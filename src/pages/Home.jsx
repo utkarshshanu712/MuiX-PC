@@ -32,6 +32,8 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTopPlaylists } from '../contexts/TopPlaylistsContext';
+import { useUserPreferences } from '../contexts/UserPreferencesContext';
 
 const categories = [
   { id: "trending", title: "Trending Now", query: "trending songs" },
@@ -462,6 +464,8 @@ const ScrollableSection = ({ title, songs, onSongSelect, onLoadMore, hasMore }) 
 };
 
 const Home = ({ onSongSelect, username }) => {
+  const { topPlaylists, isLoading } = useTopPlaylists();
+  const { recentlyPlayed } = useUserPreferences();
   const [categoryData, setCategoryData] = useState({});
   const [loading, setLoading] = useState({});
   const [pages, setPages] = useState({});
@@ -633,6 +637,29 @@ const Home = ({ onSongSelect, username }) => {
           ))}
         </Box>
       </Box>
+
+      {recentlyPlayed.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Typography 
+            variant="h6"
+            sx={{ 
+              fontSize: { xs: '2rem', sm: '2.25rem' },
+              fontWeight: 600,
+              mb: { xs: 2, sm: 2.5 },
+              color: '#4DC1CC',
+            }}
+          >
+            Recently Played
+          </Typography>
+          <Grid container spacing={2}>
+            {recentlyPlayed.slice(0, 6).map((song) => (
+              <Grid item xs={6} sm={4} md={3} lg={2} key={song.id}>
+                <SongCard song={song} onSongSelect={onSongSelect} />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      )}
 
       {categories.map((category) => (
         <ScrollableSection

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, IconButton, CircularProgress, Chip, Stack, Menu, MenuItem } from '@mui/material';
 import { 
   Favorite, FavoriteBorder, PlayArrow, Pause, 
-  PlaylistAdd, ArrowBack, Timer, MoreVert 
+  PlaylistAdd, ArrowBack, Timer, MoreVert,
+  Language 
 } from '@mui/icons-material';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +11,7 @@ import { useSwipeable } from 'react-swipeable';
 import { useNavigate } from 'react-router-dom';
 import { useLibrary } from '../contexts/LibraryContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useUserPreferences } from '../contexts/UserPreferencesContext';
 
 const categories = [
   {
@@ -32,9 +34,32 @@ const categories = [
       'A. R. Rahman', 'Mohit Chauhan', 'Sunidhi Chauhan', 'Kumar Sanu', 'Alka Yagnik',
       'Udit Narayan', 'Sonu Nigam', 'Shankar Mahadevan', 'Kailash Kher', 'Javed Ali',
       'KK', 'Rahat Fateh Ali Khan', 'Mika Singh', 'Himesh Reshammiya', 'Yo Yo Honey Singh',
-      'Badshah', 'Diljit Dosanjh', 'Guru Randhawa', 'Neha Kakkar'
-    ]
-  },
+      'Badshah', 'Diljit Dosanjh', 'Guru Randhawa', 'Neha Kakkar',
+            'Featured Playlists', 'Recommended for today', 'trending songs', 'popular songs', 'top charts', 'Mix',
+            'new releases', 'hot tracks', 'top hits', 'latest songs', 'music mix', 'best of the week',
+            'editors picks', 'recommended for you', 'must-listen', 'top 100 songs',
+            'Pyaar', 'Dil', 'Dard', 'Ishq', 'Mohabbat', 'Judaai', 'Bewafa', 'Dhoka',
+            'Yaadein', 'Intezaar', 'Tanhai', 'Romantic', 'Love Songs Hindi', 'Hindi Hits',
+            'Bollywood Romance', 'Hindi Love Mix', 'Sad Love Songs Hindi', 'Bollywood', 'Hindi', 'Indian', 'Desi',
+            'Bollywood Hits', 'Hindi Songs', 'Indian Music', 'Desi Music', 'Bollywood Music', 'Hindi Music',
+            'Arijit Singh', 'Shreya Ghoshal', 'Atif Aslam', 'A. R. Rahman', 'Mohit Chauhan',
+            'Sunidhi Chauhan', 'Kumar Sanu', 'Alka Yagnik', 'Udit Narayan', 'Sonu Nigam',
+            'Shankar Mahadevan', 'Kailash Kher', 'Javed Ali', 'KK', 'Rahat Fateh Ali Khan',
+            'Mika Singh', 'Himesh Reshammiya', 'Yo Yo Honey Singh', 'Badshah', 'Diljit Dosanjh',
+            'Guru Randhawa', 'Neha Kakkar', 'Sukhwinder Singh', 'Amit Trivedi', 'Shankar Ehsaan Loy',
+            'Shan', 'Ankit Tiwari', 'Armaan Malik', 'Benny Dayal', 'Jubin Nautiyal',
+            'Nakash Aziz', 'Sukhwinder Singh', 'Vishal-Shekhar', 'Pritam', 'Mithoon',
+            'Salim-Sulaiman', 'Ajay-Atul', 'Sachin-Jigar', 'Akhil', 'Jasleen Royal', 
+            'Harshdeep Kaur', 'Shalmali Kholgade', 'Tulsi Kumar', 'Palak Muchhal', 'Neeti Mohan', 
+            'Shaan', 'Sneha Khanwalkar', 'Aditi Singh Sharma', 'Aastha Gill', 'Neha Bhasin', 
+            'Monali Thakur', 'Richa Sharma', 'Jonita Gandhi', 'Kanika Kapoor', 'Hard Kaur', 
+            'Anusha Mani', 'Anushka Manchanda', 'Dhvani Bhanushali', 'Pawni Pandey', 'Kavita Seth', 
+            'Ananya Birla', 'Akasa Singh', 'Ritviz', 'Badshah', 'Bohemia', 'Raftaar', 'DIVINE', 
+            'Nucleya', 'Prabh Deep', 'Emiway Bantai', 'Naezy', 'Brodha V', 'KRSNA', 'MC Stan', 
+            'Kaam Bhari', 'Seedhe Maut', 'Ikka', 'Bali', 'Karma'
+          ]
+        },
+        
   {
     name: 'Chill',
     color: '#4A90E2',
@@ -451,6 +476,8 @@ const MusicCard = ({ song, isPlaying, onPlay, onNext, isLiked, onLike, isVisible
 };
 
 const ForYou = () => {
+  const { selectedLanguage, setSelectedLanguage, languages } = useUserPreferences();
+  const [languageAnchorEl, setLanguageAnchorEl] = useState(null);
   const [songs, setSongs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -474,10 +501,20 @@ const ForYou = () => {
     const category = categories.find(c => c.name === categoryName);
     if (!category) return '';
 
-    const queries = category.queries;
+    let queries = category.queries;
+    
+    // Filter queries based on selected language
+    if (selectedLanguage !== 'Mix') {
+      queries = queries.filter(q => 
+        q.toLowerCase().includes(selectedLanguage.toLowerCase()) ||
+        !(['hindi', 'punjabi', 'bhojpuri', 'haryanvi', 'rajasthani', 'english'].some(lang => 
+          q.toLowerCase().includes(lang)
+        ))
+      );
+    }
+
     let availableQueries = queries.filter(q => !queryHistory.includes(q));
     
-    // If all queries have been used, reset the history but keep the last query
     if (availableQueries.length === 0) {
       const lastUsedQuery = queryHistory[queryHistory.length - 1];
       setQueryHistory([lastUsedQuery]);
@@ -488,7 +525,9 @@ const ForYou = () => {
     setQueryHistory(prev => [...prev, newQuery]);
     setLastQuery(currentQuery);
     setCurrentQuery(newQuery);
-    return newQuery;
+    
+    // Add language to query if not 'Mix'
+    return selectedLanguage !== 'Mix' ? `${selectedLanguage} ${newQuery}` : newQuery;
   };
 
   const fetchSongs = async (resetSongs = false) => {
@@ -506,14 +545,31 @@ const ForYou = () => {
         `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}&page=${resetSongs ? 1 : page}&limit=10`
       );
 
+      if (!response.data?.data?.results) {
+        throw new Error('No results found');
+      }
+
       const filteredSongs = response.data.data.results.filter(song => {
         if (!song || !song.id || playedSongs.has(song.id)) return false;
 
+        // Language-based filtering
+        if (selectedLanguage !== 'Mix') {
+          const songLanguage = song.language?.toLowerCase() || '';
+          const songName = (song.name || '').toLowerCase();
+          const artistName = (song.primaryArtists || '').toLowerCase();
+          const selectedLang = selectedLanguage.toLowerCase();
+          
+          // Check if song matches selected language
+          if (!songLanguage.includes(selectedLang) && 
+              !songName.includes(selectedLang) && 
+              !artistName.includes(selectedLang)) {
+            return false;
+          }
+        }
+
         const songName = (song.name || '').toLowerCase();
         const artistName = (song.primaryArtists || '').toLowerCase();
-        const playCount = parseInt(song.playCount || '0');
 
-        const lowEngagementThreshold = 1000;
         const forbiddenTerms = [
           'nursery', 'rhyme', 'kids', 'children', 'baby', 'cartoon',
           'learning', 'education', 'school'
@@ -523,10 +579,9 @@ const ForYou = () => {
           songName.includes(term) || artistName.includes(term)
         );
 
-        return !isKidsSong && playCount >= lowEngagementThreshold;
+        return !isKidsSong;
       });
 
-      // Shuffle the filtered songs
       const shuffledSongs = [...filteredSongs].sort(() => Math.random() - 0.5);
 
       if (resetSongs) {
@@ -538,13 +593,14 @@ const ForYou = () => {
         setPage(prev => prev + 1);
       }
 
-      // If we got too few songs, fetch from another query immediately
-      if (filteredSongs.length < 5 && !resetSongs) {
+      if (filteredSongs.length < 5) {
         setTimeout(() => fetchSongs(false), 1000);
       }
     } catch (err) {
       console.error('Error fetching songs:', err);
       setError('Failed to load songs');
+      // If error occurs, try fetching with a different query
+      setTimeout(() => fetchSongs(resetSongs), 2000);
     } finally {
       setLoading(false);
       setIsFetching(false);
@@ -705,6 +761,34 @@ const ForYou = () => {
     };
   }, [currentIndex, songs, streamingQuality, getUrlForQuality]);
 
+  const handleLanguageClick = (event) => {
+    setLanguageAnchorEl(event.currentTarget);
+  };
+
+  const handleLanguageClose = () => {
+    setLanguageAnchorEl(null);
+  };
+
+  const handleLanguageSelect = (language) => {
+    setSelectedLanguage(language);
+    handleLanguageClose();
+    // Reset and fetch new songs when language changes
+    setPlayedSongs(new Set());
+    setSongs([]);
+    setCurrentIndex(0);
+    setPage(1);
+    fetchSongs(true);
+  };
+
+  // Reset songs when language changes
+  useEffect(() => {
+    setPlayedSongs(new Set());
+    setSongs([]);
+    setCurrentIndex(0);
+    setPage(1);
+    fetchSongs(true);
+  }, [selectedLanguage]);
+
   const handlers = useSwipeable({
     onSwipedUp: () => {
       handleNext();
@@ -729,6 +813,46 @@ const ForYou = () => {
 
   return (
     <Box sx={{ height: '100vh', overflow: 'hidden', bgcolor: '#121212', position: 'relative' }}>
+      {/* Language Selector */}
+      <Box sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1000 }}>
+        <IconButton
+          onClick={handleLanguageClick}
+          sx={{
+            bgcolor: selectedLanguage !== 'Mix' ? '#1DB954' : 'rgba(255,255,255,0.1)',
+            '&:hover': { bgcolor: selectedLanguage !== 'Mix' ? '#1ed760' : 'rgba(255,255,255,0.2)' },
+          }}
+        >
+          <Language sx={{ color: 'white' }} />
+        </IconButton>
+        <Menu
+          anchorEl={languageAnchorEl}
+          open={Boolean(languageAnchorEl)}
+          onClose={handleLanguageClose}
+          PaperProps={{
+            sx: {
+              bgcolor: '#282828',
+              color: 'white',
+              maxHeight: '300px',
+            }
+          }}
+        >
+          {languages.map((lang) => (
+            <MenuItem
+              key={lang}
+              onClick={() => handleLanguageSelect(lang)}
+              selected={selectedLanguage === lang}
+              sx={{
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                '&.Mui-selected': { bgcolor: 'rgba(29,185,84,0.3)' },
+                minWidth: '150px'
+              }}
+            >
+              {lang}
+            </MenuItem>
+          ))}
+        </Menu>
+      </Box>
+
       {/* Categories */}
       <Stack
         direction="row"
