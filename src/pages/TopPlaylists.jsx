@@ -119,7 +119,7 @@ const TopPlaylists = () => {
               >
                 <CardMedia
                   component="img"
-                  image={playlist.image}
+                  image={playlist.image[2].url}
                   alt={playlist.title}
                   sx={{
                     aspectRatio: '1/1',
