@@ -57,159 +57,110 @@ const TopPlaylists = () => {
         justifyContent: { xs: 'flex-start', sm: 'space-between' },
         mb: { xs: 3, sm: 4 },
         gap: { xs: 2, sm: 0 },
+        px: 1,
       }}>
         <Typography 
           variant="h5"
-          component="h1" 
-          sx={{ 
+          component="h1"
+          sx={{
             fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
             fontWeight: 700,
             color: '#4DC1CC',
+            mb: { xs: 1, sm: 0 },
           }}
         >
           Top Playlists
         </Typography>
+        
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center',
           gap: 2,
         }}>
-          <Typography 
-            variant="subtitle1"
-            sx={{ 
-              fontSize: { xs: '0.875rem', sm: '1rem' },
-              color: 'rgba(255, 255, 255, 0.7)',
-            }}
-          >
-            Category:
+          <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+            Language:
           </Typography>
           <Select
-            value={selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)}
+            value={selectedLanguage}
             onChange={handleLanguageChange}
+            size="small"
             sx={{
-              minWidth: { xs: 140, sm: 160 },
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              minWidth: 120,
               '& .MuiSelect-select': {
                 py: 1,
-                color: 'white',
-              },
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#4DC1CC',
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#4DC1CC',
               },
             }}
           >
             {languages.map((lang) => (
               <MenuItem key={lang} value={lang}>
-                {lang}
+                {lang.charAt(0).toUpperCase() + lang.slice(1)}
               </MenuItem>
             ))}
           </Select>
         </Box>
       </Box>
 
-      {playlists.length === 0 ? (
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '200px',
-          color: 'rgba(255, 255, 255, 0.7)',
-          bgcolor: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: 2,
-          mx: { xs: 1, sm: 2 },
-        }}>
-          <Typography variant="body1" sx={{ textAlign: 'center' }}>
-            No playlists found for {selectedLanguage}
-          </Typography>
-        </Box>
-      ) : (
-        <Box sx={{ px: { xs: 1, sm: 2 } }}>
-          <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
-            {playlists.map((playlist) => (
-              <Grid item xs={6} sm={4} md={3} lg={2.4} key={playlist.id}>
-                <Card
-                  onClick={() => handlePlaylistClick(playlist)}
+      <Box sx={{ px: { xs: 1, sm: 2 } }}>
+        <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
+          {playlists.map((playlist) => (
+            <Grid item xs={6} sm={4} md={3} lg={2.4} key={playlist.id}>
+              <Card 
+                onClick={() => handlePlaylistClick(playlist)}
+                sx={{ 
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s',
+                  '&:hover': {
+                    transform: 'scale(1.02)',
+                  },
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <CardMedia
+                  component="img"
+                  image={playlist.image}
+                  alt={playlist.title}
                   sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    cursor: 'pointer',
-                    '&:hover': { 
-                      bgcolor: 'rgba(255, 255, 255, 0.15)',
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 4px 12px rgba(77, 193, 204, 0.2)',
-                    },
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: 'all 0.3s ease',
-                    borderRadius: { xs: 1.5, sm: 2 },
-                    overflow: 'hidden',
+                    aspectRatio: '1/1',
+                    objectFit: 'cover',
                   }}
-                >
-                  <Box sx={{ position: 'relative', paddingTop: '100%' }}>
-                    <CardMedia
-                      component="img"
-                      image={playlist.image?.[2]?.url || '/default-playlist.png'}
-                      alt={playlist.name}
-                      sx={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        transition: 'transform 0.3s ease',
-                        '&:hover': {
-                          transform: 'scale(1.05)',
-                        },
-                      }}
-                    />
-                  </Box>
-                  <CardContent 
+                />
+                <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+                  <Typography 
+                    variant="subtitle1" 
                     sx={{ 
-                      p: { xs: 1.5, sm: 2 },
-                      flexGrow: 1,
-                      bgcolor: 'rgba(0, 0, 0, 0.5)',
+                      fontWeight: 500,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      lineHeight: 1.2,
+                      mb: 0.5,
                     }}
                   >
-                    <Typography 
-                      variant="body1"
-                      sx={{ 
-                        color: 'white',
-                        fontSize: { xs: '0.85rem', sm: '0.9rem', md: '1rem' },
-                        fontWeight: 600,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        mb: 0.5,
-                      }}
-                    >
-                      {playlist.name}
-                    </Typography>
-                    <Typography 
-                      variant="body2"
-                      sx={{ 
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: { xs: '0.75rem', sm: '0.8rem' },
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {playlist.songCount || 'Loading...'} songs
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      )}
+                    {playlist.title}
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary"
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 1,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                  >
+                    {playlist.description}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
     </Box>
   );
 };
