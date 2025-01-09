@@ -54,7 +54,48 @@ const darkTheme = createTheme({
 
 function AppContent() {
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isForYouPage = location.pathname === '/for-you';
+  const [navigationKey, setNavigationKey] = useState(0);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  // Reset navigation state when location changes
+  useEffect(() => {
+    if (isNavigating) return; // Prevent multiple navigation attempts
+    
+    setIsNavigating(true);
+    const timer = setTimeout(() => {
+      setIsNavigating(false);
+      setNavigationKey(prev => prev + 1);
+      // Force scroll to top on navigation
+      window.scrollTo(0, 0);
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
+  // Prevent navigation when already navigating
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.setItem('lastPath', location.pathname);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [location.pathname]);
+
+  // Handle back/forward browser buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      if (!isNavigating) {
+        setNavigationKey(prev => prev + 1);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isNavigating]);
 
   const [username, setUsername] = useState(
     localStorage.getItem("username") || ""
@@ -66,7 +107,6 @@ function AppContent() {
   const MINIMUM_QUEUE_LENGTH = 50;
   const FETCH_THRESHOLD = 10;
 
-  // Simplified initialization - just use stored track directly
   useEffect(() => {
     const storedTrack = localStorage.getItem("currentTrack");
     if (storedTrack) {

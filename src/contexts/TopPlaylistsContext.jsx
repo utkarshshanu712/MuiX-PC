@@ -9,50 +9,100 @@ export const TopPlaylistsProvider = ({ children }) => {
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
+  const [selectedLanguage, setSelectedLanguage] = useState('All');
 
-  const languages = ['Hindi','English', 'Mix', 'Punjabi','Bhojpuri','Haryanvi','Rajasthani','Coldplay' ,'Diljit dosanjh','Arijit','Honey','Tamil','Telugu', 'Marathi', 'Gujarati', 'Bengali', 'Kannada', 'Malayalam',];
+  const languages = [
+    // Categories
+    'All','हिन्दी', 'Mix', 'Punjabi', 'Bhojpuri', 'Haryanvi', 'Rajasthani',
+    // Regional Languages
+    'Tamil', 'Telugu', 'Marathi', 'Gujarati', 'Bengali', 'Kannada', 'Malayalam',
+    // Artists - Punjabi
+    'Diljit Dosanjh', 'AP Dhillon', 'Sidhu Moosewala', 'Honey ', 'Guru Randhawa', 'Karan Aujla',
+    // Artists - Hindi
+    'Arijit ', 'Neha Kakkar', 'Badshah', 'Jubin Nautiyal', 'B Praak', 'Atif Aslam',
+    'KK', 'Shreya Ghoshal', 'Sonu Nigam', 'Kumar Sanu', 'Armaan Malik', 'Vishal-Shekhar',
+    'Pritam', 'AR Rahman', 'Amit Trivedi', 'Mohit Chauhan', 'Manoj Muntashir',
+    // Artists - Bhojpuri
+    'Manoj Tiwari', 'Pawan Singh', 'Khesari Lal Yadav', 'Nirahua', 'Amrapali Dubey', 'Akshara Singh',
+    'Ritesh Pandey', 'Pradeep Pandey', 'Vinay Bihari', 'Bhojpuri Shakti', 'Anupama Yadav',
+  ];
+
+  // Helper function to check if selected option is an artist
+  const isArtist = (selected) => {
+    const artists = [
+      // Punjabi Artists
+      'Diljit Dosanjh', 'AP Dhillon', 'Sidhu Moosewala', 'Honey Singh', 'Guru Randhawa', 'Karan Aujla',
+      // Hindi Artists
+      'Arijit Singh', 'Neha Kakkar', 'Badshah', 'Jubin Nautiyal', 'B Praak', 'Atif Aslam',
+      'KK', 'Shreya Ghoshal', 'Sonu Nigam', 'Kumar Sanu', 'Armaan Malik', 'Vishal-Shekhar',
+      'Pritam', 'AR Rahman', 'Amit Trivedi', 'Mohit Chauhan',   'Manoj Muntashir',
+      // Bhojpuri Artists
+      'Manoj Tiwari', 'Pawan Singh', 'Khesari Lal Yadav', 'Nirahua', 'Amrapali Dubey', 'Akshara Singh',
+      'Ritesh Pandey', 'Pradeep Pandey', 'Vinay Bihari', 'Bhojpuri Shakti', 'Anupama Yadav',
+    ];
+    return artists.includes(selected);
+  };
 
   const fetchPlaylists = async () => {
     setLoading(true);
-    setError(null)
+    setError(null);
     setPlaylists([]);
 
     try {
-      // Base query structure based on language
-      const baseQuery = selectedLanguage.toLowerCase() === 'English' ? '' : `${selectedLanguage.toLowerCase()} `;
-
-      const queries = [
-        // Popular categories
-        `${baseQuery}top songs 2024`,
-        `${baseQuery}hit songs`,
-        `${baseQuery}popular songs`,
-        `${baseQuery}trending songs`,
-        `${baseQuery}latest songs`,
+      let queries = [];
+      
+      if (isArtist(selectedLanguage)) {
+        queries = [
+          `${selectedLanguage} hits`,
+          `${selectedLanguage} popular songs`,
+          `${selectedLanguage} greatest hits`,
+          `${selectedLanguage} all songs`,
+          `${selectedLanguage} top songs`,
+          `${selectedLanguage} best songs`,
+          `${selectedLanguage} playlist`,
+          `best of ${selectedLanguage}`,
+          `${selectedLanguage} collection`,
+          `${selectedLanguage} album`,
+          `${selectedLanguage} live`,
+          `${selectedLanguage} acoustic`,
+          `${selectedLanguage} essentials`,
+          `${selectedLanguage} classics`,
+          `${selectedLanguage} latest`
+        ];
+      } else {
+        // Base query structure based on language
+        const baseQuery = selectedLanguage.toLowerCase() === 'hindi' ? '' : `${selectedLanguage.toLowerCase()} `;
         
-        // Genre based
-        `${baseQuery}pop songs`,
-        `${baseQuery}rock songs`,
-        `${baseQuery}rap songs`,
-        `${baseQuery}hip hop songs`,
-        `${baseQuery}edm songs`,
-        
-        // Mood based
-        `${baseQuery}romantic songs`,
-        `${baseQuery}party songs`,
-        `${baseQuery}dance songs`,
-        `${baseQuery}chill songs`,
-        `${baseQuery}workout songs`,
-        `${baseQuery}Sleep songs`,
-        `${baseQuery}Sad songs`,
-        
-        // Era based
-        `${baseQuery}2020s songs`,
-        `${baseQuery}2010s hits`,
-        `${baseQuery}2000s hits`,
-        `${baseQuery}90s hits`,
-        `${baseQuery}80s hits`,
-      ];
+        queries = [
+          // Popular categories
+          `${baseQuery}top songs 2024`,
+          `${baseQuery}hit songs`,
+          `${baseQuery}popular songs`,
+          `${baseQuery}trending songs`,
+          `${baseQuery}latest songs`,
+          
+          // Genre based
+          `${baseQuery}pop songs`,
+          `${baseQuery}romantic hits`,
+          `${baseQuery}dance hits`,
+          `${baseQuery}party hits`,
+          `${baseQuery}folk songs`,
+          
+          // Mood based
+          `${baseQuery}romantic songs`,
+          `${baseQuery}party songs`,
+          `${baseQuery}dance songs`,
+          `${baseQuery}chill songs`,
+          `${baseQuery}workout songs`,
+          `${baseQuery}sad songs`,
+          
+          // Era based
+          `${baseQuery}2024 hits`,
+          `${baseQuery}new songs`,
+         
+          `${baseQuery}classic hits`
+        ];
+      }
 
       const playlistPromises = queries.map(async (query) => {
         try {

@@ -44,7 +44,7 @@ const TopPlaylists = () => {
 
   return (
     <Box sx={{ 
-      p: { xs: 1, sm: 3 },
+      p: { xs: 2, sm: 3, md: 4 },
       pb: { xs: 'calc(2rem + 90px)', sm: 'calc(3rem + 90px)' },
       overflowX: 'hidden',
       width: '100%',
@@ -52,30 +52,33 @@ const TopPlaylists = () => {
     }}>
       <Box sx={{ 
         display: 'flex', 
-        flexDirection: 'column',
+        flexDirection: { xs: 'column', sm: 'row' },
+        alignItems: { xs: 'flex-start', sm: 'center' },
+        justifyContent: { xs: 'flex-start', sm: 'space-between' },
         mb: { xs: 3, sm: 4 },
-        px: 1,
+        gap: { xs: 2, sm: 0 },
       }}>
         <Typography 
           variant="h5"
           component="h1" 
           sx={{ 
-            fontSize: { xs: '2rem', sm: '2.25rem' },
+            fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
             fontWeight: 700,
-            mb: 1,
             color: '#4DC1CC',
-            ml: 4,
           }}
         >
           Top Playlists
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', ml: 4, mb: 2 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          gap: 2,
+        }}>
           <Typography 
             variant="subtitle1"
             sx={{ 
               fontSize: { xs: '0.875rem', sm: '1rem' },
               color: 'rgba(255, 255, 255, 0.7)',
-              mr: 2,
             }}
           >
             Category:
@@ -84,17 +87,20 @@ const TopPlaylists = () => {
             value={selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)}
             onChange={handleLanguageChange}
             sx={{
-              minWidth: 120,
+              minWidth: { xs: 140, sm: 160 },
               bgcolor: 'rgba(255, 255, 255, 0.1)',
               '& .MuiSelect-select': {
-                py: 0.5,
+                py: 1,
                 color: 'white',
               },
               '& .MuiOutlinedInput-notchedOutline': {
                 borderColor: 'rgba(255, 255, 255, 0.1)',
               },
               '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderColor: '#4DC1CC',
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: '#4DC1CC',
               },
             }}
           >
@@ -114,31 +120,35 @@ const TopPlaylists = () => {
           alignItems: 'center', 
           height: '200px',
           color: 'rgba(255, 255, 255, 0.7)',
+          bgcolor: 'rgba(255, 255, 255, 0.05)',
+          borderRadius: 2,
+          mx: { xs: 1, sm: 2 },
         }}>
-          <Typography>
+          <Typography variant="body1" sx={{ textAlign: 'center' }}>
             No playlists found for {selectedLanguage}
           </Typography>
         </Box>
       ) : (
-        <Box sx={{ px: 1 }}>
-          <Grid container spacing={0.25}>
+        <Box sx={{ px: { xs: 1, sm: 2 } }}>
+          <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
             {playlists.map((playlist) => (
-              <Grid item xs={6} key={playlist.id}>
+              <Grid item xs={6} sm={4} md={3} lg={2.4} key={playlist.id}>
                 <Card
                   onClick={() => handlePlaylistClick(playlist)}
                   sx={{
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                     cursor: 'pointer',
                     '&:hover': { 
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
-                      transform: 'scale(1.02)',
+                      bgcolor: 'rgba(255, 255, 255, 0.15)',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 4px 12px rgba(77, 193, 204, 0.2)',
                     },
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
-                    transition: 'all 0.3s',
-                    mx: 0.5,
-                    borderRadius: 1,
+                    transition: 'all 0.3s ease',
+                    borderRadius: { xs: 1.5, sm: 2 },
+                    overflow: 'hidden',
                   }}
                 >
                   <Box sx={{ position: 'relative', paddingTop: '100%' }}>
@@ -153,19 +163,30 @@ const TopPlaylists = () => {
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
+                        transition: 'transform 0.3s ease',
+                        '&:hover': {
+                          transform: 'scale(1.05)',
+                        },
                       }}
                     />
                   </Box>
-                  <CardContent sx={{ p: 1, flexGrow: 1 }}>
+                  <CardContent 
+                    sx={{ 
+                      p: { xs: 1.5, sm: 2 },
+                      flexGrow: 1,
+                      bgcolor: 'rgba(0, 0, 0, 0.5)',
+                    }}
+                  >
                     <Typography 
                       variant="body1"
                       sx={{ 
                         color: 'white',
-                        fontSize: '0.9rem',
-                        fontWeight: 500,
+                        fontSize: { xs: '0.85rem', sm: '0.9rem', md: '1rem' },
+                        fontWeight: 600,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
+                        mb: 0.5,
                       }}
                     >
                       {playlist.name}
@@ -174,7 +195,7 @@ const TopPlaylists = () => {
                       variant="body2"
                       sx={{ 
                         color: 'rgba(255, 255, 255, 0.7)',
-                        fontSize: '0.8rem',
+                        fontSize: { xs: '0.75rem', sm: '0.8rem' },
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
