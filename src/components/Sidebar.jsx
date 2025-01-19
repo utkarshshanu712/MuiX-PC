@@ -36,7 +36,8 @@ import {
   FollowTheSigns,
   FollowTheSignsTwoTone,
   FavoriteBorder,
-  Group
+  Group,
+  Download
 } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 import { useLibrary } from '../contexts/LibraryContext';

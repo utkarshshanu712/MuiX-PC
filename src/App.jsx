@@ -373,7 +373,7 @@ function AppContent() {
                 bgcolor: "#121212",
               }}
             >
-              <Routes>
+              <Routes key={navigationKey}>
                 <Route path="/" element={<Home onSongSelect={handleSongSelect} username={username} />} />
                 <Route path="/for-you" element={<ForYou />} />
                 <Route path="/library" element={<Library />} />

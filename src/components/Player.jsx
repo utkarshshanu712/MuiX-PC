@@ -149,16 +149,6 @@ const QueueDrawer = memo(({ open, onClose, queue, onQueueItemClick }) => (
   </Drawer>
 ));
 
-// Sleep timer options in minutes
-const SLEEP_TIMER_OPTIONS = [
-  { value: 15, label: '15 minutes' },
-  { value: 30, label: '30 minutes' },
-  { value: 45, label: '45 minutes' },
-  { value: 60, label: '1 hour' },
-  { value: 90, label: '1.5 hours' },
-  { value: 120, label: '2 hours' },
-];
-
 const Player = ({
   currentTrack = null,
   onNext = () => {},
@@ -172,6 +162,7 @@ const Player = ({
   const audioRef = useRef(new Audio());
   const { streamingQuality, downloadQuality, getUrlForQuality } = useSettings();
   const { addToRecentlyPlayed } = useUserPreferences();
+  const { likedSongs, toggleLikeSong } = useLibrary();
   const [volume, setVolume] = useLocalStorage("playerVolume", 1);
   const [isMuted, setIsMuted] = useLocalStorage("playerMuted", false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -181,34 +172,14 @@ const Player = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [timerAnchorEl, setTimerAnchorEl] = useState(null);
-  const [sleepTimer, setSleepTimer] = useState(null);
+  const [timerDuration, setTimerDuration] = useState(null);
   const [timerRemaining, setTimerRemaining] = useState(null);
   const [queuePosition, setQueuePosition] = useState(0);
   const [playHistory, setPlayHistory] = useState([]);
-  const { likedSongs, toggleLikeSong } = useLibrary();
   const [playlistAnchor, setPlaylistAnchor] = useState(null);
   const isLiked = currentTrack
     ? likedSongs.some((song) => song.id === currentTrack.id)
     : false;
-
-  const formatTime = (time) => {
-    if (!time) return '0:00';
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const formatTimerDisplay = (seconds) => {
-    if (!seconds) return '';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
 
   const handleTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
@@ -221,6 +192,53 @@ const Player = ({
       });
     }
   }, []);
+
+  const handleNext = useCallback(() => {
+    if (onNext) {
+      setQueuePosition((prev) => prev + 1);
+      onNext();
+    }
+  }, [onNext]);
+
+  const handlePrevious = useCallback(() => {
+    if (currentTime > 3) {
+      // If current time > 3 seconds, restart the current track
+      audioRef.current.currentTime = 0;
+    } else if (playHistory.length > 0) {
+      // Go to previous track in history
+      const previousTrack = playHistory[playHistory.length - 1];
+      setPlayHistory(prev => prev.slice(0, -1));
+      onQueueItemClick(previousTrack, queuePosition - 1);
+      setQueuePosition(prev => prev - 1);
+    } else if (hasPrevious) {
+      onPrevious();
+    }
+  }, [currentTime, playHistory, hasPrevious, onPrevious, onQueueItemClick, queuePosition]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+
+    const handleEnded = () => {
+      if (queuePosition < queue.length - 1) {
+        handleNext();
+      } else {
+        setIsPlaying(false);
+      }
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('loadedmetadata', () => {
+      if (!isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    });
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [handleTimeUpdate, handleNext, queue.length, queuePosition]);
 
   const handleSliderChange = useCallback((_, newValue) => {
     const audio = audioRef.current;
@@ -243,21 +261,6 @@ const Player = ({
     }
   }, []);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', () => {
-      if (!isNaN(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    });
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, [handleTimeUpdate]);
-
   const handleQueueClick = useCallback((e) => {
     e?.stopPropagation();
     setShowQueue(true);
@@ -271,75 +274,11 @@ const Player = ({
     setIsExpanded(false);
   }, []);
 
-  const handleTimerClick = (event) => {
-    setTimerAnchorEl(event.currentTarget);
-  };
-
-  const handleTimerClose = () => {
-    setTimerAnchorEl(null);
-  };
-
-  const handleTimerSet = (minutes) => {
-    if (!minutes) {
-      setSleepTimer(null);
-      setTimerRemaining(null);
-    } else {
-      const endTime = Date.now() + minutes * 60 * 1000;
-      setSleepTimer(endTime);
-      setTimerRemaining(minutes * 60);
-    }
-    handleTimerClose();
-  };
-
-  useEffect(() => {
-    if (!sleepTimer) {
-      setTimerRemaining(null);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const remaining = Math.max(0, Math.floor((sleepTimer - now) / 1000));
-      
-      if (remaining <= 0) {
-        clearInterval(interval);
-        setSleepTimer(null);
-        setTimerRemaining(null);
-        if (audioRef.current && isPlaying) {
-          audioRef.current.pause();
-          setIsPlaying(false);
-        }
-      } else {
-        setTimerRemaining(remaining);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [sleepTimer, isPlaying]);
-
-  const handleDownload = async (track) => {
-    try {
-      const downloadUrl = getUrlForQuality(track.downloadUrl, downloadQuality);
-      const response = await fetch(downloadUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to download: ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${track.name}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error downloading track:', error);
-      setError(`Failed to download: ${error.message}`);
-    }
-  };
+  const handleQueueItemClick = useCallback((song, index) => {
+    setQueuePosition(index);
+    onQueueItemClick(song, index);
+    handleCloseQueue();
+  }, [onQueueItemClick, handleCloseQueue]);
 
   useEffect(() => {
     if (!currentTrack) return;
@@ -355,29 +294,13 @@ const Player = ({
       });
     }
 
-    // Cleanup function to abort any pending operations
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
       }
     };
-  }, [currentTrack, streamingQuality]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', () => {
-      if (!isNaN(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    });
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, [handleTimeUpdate]);
+  }, [currentTrack, streamingQuality, getUrlForQuality, isPlaying]);
 
   useEffect(() => {
     if (currentTrack && isPlaying) {
@@ -385,70 +308,124 @@ const Player = ({
     }
   }, [currentTrack, isPlaying, addToRecentlyPlayed]);
 
-  const handleQueueItemClick = useCallback((song, index) => {
-    setQueuePosition(index);
-    onQueueItemClick(song, index);
-    handleCloseQueue();
-  }, [onQueueItemClick, handleCloseQueue]);
-
-  const handlePrevious = useCallback(() => {
-    if (currentTime > 3) {
-      // If current time > 3 seconds, restart the current track
-      audioRef.current.currentTime = 0;
-    } else if (playHistory.length > 0) {
-      // Go to previous track in history
-      const previousTrack = playHistory[playHistory.length - 1];
-      setPlayHistory(prev => prev.slice(0, -1));
-      onQueueItemClick(previousTrack, queuePosition - 1);
-      setQueuePosition(prev => prev - 1);
-    } else if (hasPrevious) {
-      onPrevious();
-    }
-  }, [currentTime, playHistory, hasPrevious, onPrevious, onQueueItemClick, queuePosition]);
-
-  const handlePlayPause = () => {
+  const handlePlayPause = useCallback(() => {
     if (error) return;
 
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          console.error("Playback failed:", error);
-          setError("Failed to play this track. Please try another.");
-        });
-      }
+      audioRef.current.play().catch(error => {
+        console.error('Error playing audio:', error);
+        setError(error.message || 'Failed to play audio. Please try again.');
+      });
     }
     setIsPlaying(!isPlaying);
-  };
+  }, [error, isPlaying]);
 
-  const handleVolumeChange = (event, newValue) => {
-    // Ensure volume is between 0 and 1
+  const handleVolumeChange = useCallback((event, newValue) => {
     const volume = Math.max(0, Math.min(newValue / 100, 1));
     setVolume(volume);
     audioRef.current.volume = volume;
-  };
+  }, [setVolume]);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     setIsMuted(!isMuted);
-  };
-
-  const handleNext = useCallback(() => {
-    if (onNext) {
-      setQueuePosition((prev) => prev + 1);
-      onNext();
-    }
-  }, [onNext]);
+  }, [isMuted, setIsMuted]);
 
   useEffect(() => {
     audioRef.current.volume = isMuted ? 0 : volume;
   }, [volume, isMuted]);
 
-  // Restore volume on mount
+  const formatTime = (time) => {
+    if (!time) return '0:00';
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatTimerDisplay = (seconds) => {
+    if (!seconds) return '';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleTimerClick = (event) => {
+    setTimerAnchorEl(event.currentTarget);
+  };
+
+  const handleTimerClose = () => {
+    setTimerAnchorEl(null);
+  };
+
+  const handleTimerSet = (minutes) => {
+    if (!minutes) {
+      setTimerDuration(null);
+      setTimerRemaining(null);
+    } else {
+      const endTime = Date.now() + minutes * 60 * 1000;
+      setTimerDuration(endTime);
+      setTimerRemaining(minutes * 60);
+    }
+    handleTimerClose();
+  };
+
   useEffect(() => {
-    audioRef.current.volume = isMuted ? 0 : volume;
-  }, []);
+    if (!timerDuration) {
+      setTimerRemaining(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.floor((timerDuration - now) / 1000));
+      
+      if (remaining <= 0) {
+        clearInterval(interval);
+        setTimerDuration(null);
+        setTimerRemaining(null);
+        if (audioRef.current && isPlaying) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+        }
+      } else {
+        setTimerRemaining(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timerDuration, isPlaying]);
+
+  const handleDownload = async (track) => {
+    try {
+      const response = await fetch(track.downloadUrl[0].url);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${track.name}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      // Save downloaded song to localStorage
+      const downloadedSongs = JSON.parse(localStorage.getItem('downloadedSongs') || '[]');
+      const songExists = downloadedSongs.some(song => song.id === track.id);
+      
+      if (!songExists) {
+        const songData = {
+          ...track,
+          isLocal: true,
+          downloadTime: new Date().toISOString()
+        };
+        downloadedSongs.push(songData);
+        localStorage.setItem('downloadedSongs', JSON.stringify(downloadedSongs));
+      }
+    } catch (error) {
+      console.error('Error downloading song:', error);
+    }
+  };
 
   const playerControls = useMemo(
     () => (
@@ -533,14 +510,14 @@ const Player = ({
             color="primary"
             sx={{
               '& .MuiBadge-badge': {
-                fontSize: '0.6rem',
-                height: 'auto',
+                fontSize: '0.75rem',
                 padding: '0 4px',
-                minWidth: 'auto'
+                minWidth: '24px',
+                height: '20px',
               }
             }}
           >
-            <Timer color={sleepTimer ? "primary" : "inherit"} />
+            <Timer color={timerDuration ? "primary" : "inherit"} />
           </Badge>
         </IconButton>
         <IconButton onClick={onLyricsClick} sx={{ color: "white" }}>
@@ -572,7 +549,7 @@ const Player = ({
         </IconButton>
       </Box>
     ),
-    [sleepTimer, timerRemaining, isLiked]
+    [timerDuration, timerRemaining, isLiked]
   );
 
   const volumeControls = useMemo(
@@ -806,7 +783,7 @@ const Player = ({
         hasPrevious={hasPrevious}
         queue={queue}
         onQueueClick={handleQueueClick}
-        sleepTimer={sleepTimer}
+        sleepTimer={timerDuration}
         onSleepTimerSet={handleTimerSet}
         onQueueItemClick={onQueueItemClick}
         onDownload={() => currentTrack && handleDownload(currentTrack)}

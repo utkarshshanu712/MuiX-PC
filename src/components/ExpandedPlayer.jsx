@@ -136,6 +136,22 @@ const ExpandedPlayer = ({
     }
   }, [currentTime, currentTrack?.lyrics, duration]);
 
+  useEffect(() => {
+    const handleEnded = () => {
+      if (hasNext) {
+        onNext();
+      }
+    };
+
+    if (currentTrack) {
+      const audio = document.querySelector('audio');
+      if (audio) {
+        audio.addEventListener('ended', handleEnded);
+        return () => audio.removeEventListener('ended', handleEnded);
+      }
+    }
+  }, [currentTrack, hasNext, onNext]);
+
   const formatLyrics = (lyricsText) => {
     if (!lyricsText) return [];
     return lyricsText

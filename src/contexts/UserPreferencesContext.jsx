@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const UserPreferencesContext = createContext();
 
@@ -20,6 +20,14 @@ export const languages = [
   'Odia'
 ];
 
+export const useUserPreferences = () => {
+  const context = useContext(UserPreferencesContext);
+  if (!context) {
+    throw new Error('useUserPreferences must be used within a UserPreferencesProvider');
+  }
+  return context;
+};
+
 export const UserPreferencesProvider = ({ children }) => {
   const [selectedLanguage, setSelectedLanguage] = useState(() => {
     const saved = localStorage.getItem('preferredLanguage');
@@ -31,6 +39,13 @@ export const UserPreferencesProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const addToRecentlyPlayed = useCallback((song) => {
+    setRecentlyPlayed(prev => {
+      const filtered = prev.filter(s => s.id !== song.id);
+      return [song, ...filtered].slice(0, 20);
+    });
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('preferredLanguage', selectedLanguage);
   }, [selectedLanguage]);
@@ -39,32 +54,17 @@ export const UserPreferencesProvider = ({ children }) => {
     localStorage.setItem('recentlyPlayed', JSON.stringify(recentlyPlayed));
   }, [recentlyPlayed]);
 
-  const addToRecentlyPlayed = (song) => {
-    setRecentlyPlayed(prev => {
-      const filtered = prev.filter(s => s.id !== song.id);
-      return [song, ...filtered].slice(0, 20);
-    });
+  const value = {
+    selectedLanguage,
+    setSelectedLanguage,
+    recentlyPlayed,
+    addToRecentlyPlayed,
+    languages
   };
 
   return (
-    <UserPreferencesContext.Provider 
-      value={{ 
-        selectedLanguage, 
-        setSelectedLanguage, 
-        recentlyPlayed, 
-        addToRecentlyPlayed,
-        languages 
-      }}
-    >
+    <UserPreferencesContext.Provider value={value}>
       {children}
     </UserPreferencesContext.Provider>
   );
-};
-
-export const useUserPreferences = () => {
-  const context = useContext(UserPreferencesContext);
-  if (!context) {
-    throw new Error('useUserPreferences must be used within a UserPreferencesProvider');
-  }
-  return context;
 };
