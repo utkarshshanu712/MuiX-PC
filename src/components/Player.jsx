@@ -40,114 +40,169 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import PlaylistMenu from "./PlaylistMenu";
 
-// Memoized Queue Item Component
-const QueueItem = memo(({ song, index, onQueueItemClick }) => (
-  <Box
-    onClick={() => onQueueItemClick(song, index)}
-    sx={{
-      display: "flex",
-      alignItems: "center",
-      p: 1,
-      borderRadius: 1,
-      mb: 1,
-      cursor: "pointer",
-      "&:hover": {
-        bgcolor: "#383838",
-        transform: "scale(1.02)",
-        transition: "all 0.2s ease",
-      },
-    }}
-  >
-    <img
-      src={song.image?.[0]?.url || song.image?.[1]?.url}
-      alt={song.name}
-      style={{ width: 40, height: 40, borderRadius: 4, marginRight: 12 }}
-    />
-    <Box sx={{ flex: 1, minWidth: 0 }}>
-      <Typography variant="body2" color="white" noWrap>
-        {song.name}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" noWrap>
-        {song.primaryArtists || song.artists?.primary?.[0]?.name}
-      </Typography>
-    </Box>
-  </Box>
-));
+// Function to create ID3v2 tag buffer
+const createID3v2Buffer = (metadata, imageBuffer) => {
+  try {
+    // Helper function to encode text as Latin1
+    const encodeLatin1 = (text) => {
+      const cleaned = text.replace(/[^\x20-\xFF]/g, '_');
+      return new Uint8Array(cleaned.split('').map(char => char.charCodeAt(0) & 0xFF));
+    };
 
-// Memoized Queue List Component
-const QueueList = memo(({ queue, onQueueItemClick }) => (
-  <Box
-    sx={{
-      overflowY: "auto",
-      maxHeight: "calc(100vh - 100px)",
-      "&::-webkit-scrollbar": {
-        width: "8px",
-      },
-      "&::-webkit-scrollbar-track": {
-        background: "#282828",
-      },
-      "&::-webkit-scrollbar-thumb": {
-        background: "#535353",
-        borderRadius: "4px",
-      },
-    }}
-  >
-    {queue.map((song, index) => (
-      <QueueItem
-        key={song.id || index}
-        song={song}
-        index={index}
-        onQueueItemClick={onQueueItemClick}
-      />
-    ))}
-  </Box>
-));
+    // Calculate total size for all text frames
+    let totalSize = 10; // ID3v2 header size
+    const frames = [];
+    
+    // Process metadata
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (value && typeof value === 'string') {
+        const frameId = getFrameId(key);
+        if (frameId) {
+          const encodedText = encodeLatin1(value);
+          const frameSize = encodedText.length + 1; // +1 for encoding byte
+          frames.push({
+            id: frameId,
+            data: encodedText,
+            size: frameSize
+          });
+          totalSize += frameSize + 10; // 10 bytes for frame header
+        }
+      }
+    });
 
-// Memoized Queue Drawer Component
-const QueueDrawer = memo(({ open, onClose, queue, onQueueItemClick }) => (
-  <Drawer
-    anchor="right"
-    open={open}
-    onClose={onClose}
-    sx={{
-      zIndex: 1300,
-      "& .MuiBackdrop-root": {
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-      },
-    }}
-    PaperProps={{
-      sx: {
-        width: 350,
-        bgcolor: "#282828",
-        p: 2,
-      },
-    }}
-  >
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        mb: 2,
-      }}
-    >
-      <Typography variant="h6" color="white">
-        Play Queue
-      </Typography>
-      <IconButton onClick={onClose} sx={{ color: "white" }}>
-        <Close />
-      </IconButton>
-    </Box>
+    // Add size for image frame if present
+    let imageFrameSize = 0;
+    if (imageBuffer && imageBuffer.byteLength > 0) {
+      imageFrameSize = 10 + 1 + 10 + 1 + 1 + imageBuffer.byteLength;
+      totalSize += imageFrameSize;
+    }
 
-    {queue && queue.length > 0 ? (
-      <QueueList queue={queue} onQueueItemClick={onQueueItemClick} />
-    ) : (
-      <Typography color="text.secondary" sx={{ textAlign: "center", mt: 4 }}>
-        Queue is empty
-      </Typography>
-    )}
-  </Drawer>
-));
+    // Create buffer
+    const buffer = new ArrayBuffer(totalSize);
+    const view = new Uint8Array(buffer);
+    
+    // Write ID3v2 header
+    view.set([0x49, 0x44, 0x33, 0x03, 0x00, 0x00]); // ID3v2.3.0 header
+    
+    // Write total size (not synchsafe)
+    const size = totalSize - 10;
+    view[6] = (size >> 24) & 0xFF;
+    view[7] = (size >> 16) & 0xFF;
+    view[8] = (size >> 8) & 0xFF;
+    view[9] = size & 0xFF;
+
+    let offset = 10;
+
+    // Write text frames
+    frames.forEach(frame => {
+      // Frame ID
+      view.set(new TextEncoder().encode(frame.id), offset);
+      offset += 4;
+      
+      // Frame size
+      view[offset++] = (frame.size >> 24) & 0xFF;
+      view[offset++] = (frame.size >> 16) & 0xFF;
+      view[offset++] = (frame.size >> 8) & 0xFF;
+      view[offset++] = frame.size & 0xFF;
+      
+      // Frame flags (all 0)
+      view[offset++] = 0x00;
+      view[offset++] = 0x00;
+      
+      // Text encoding (ISO-8859-1)
+      view[offset++] = 0x00;
+      
+      // Frame data
+      view.set(frame.data, offset);
+      offset += frame.data.length;
+    });
+
+    // Write image frame if present
+    if (imageBuffer && imageBuffer.byteLength > 0) {
+      // APIC frame header
+      view.set(new TextEncoder().encode('APIC'), offset);
+      offset += 4;
+      
+      // Frame size
+      const pictureFrameSize = imageFrameSize - 10;
+      view[offset++] = (pictureFrameSize >> 24) & 0xFF;
+      view[offset++] = (pictureFrameSize >> 16) & 0xFF;
+      view[offset++] = (pictureFrameSize >> 8) & 0xFF;
+      view[offset++] = pictureFrameSize & 0xFF;
+      
+      // Frame flags
+      view[offset++] = 0x00;
+      view[offset++] = 0x00;
+      
+      // Picture frame content
+      view[offset++] = 0x00; // encoding
+      view.set(new TextEncoder().encode('image/jpeg\0'), offset);
+      offset += 10;
+      view[offset++] = 0x03; // picture type - cover
+      view[offset++] = 0x00; // no description
+      
+      // Image data
+      view.set(new Uint8Array(imageBuffer), offset);
+    }
+
+    return view;
+  } catch (error) {
+    console.error('Error creating ID3v2 buffer:', error);
+    throw new Error('Failed to create ID3 tags: ' + error.message);
+  }
+};
+
+const getFrameId = (key) => {
+  const frameMap = {
+    title: 'TIT2',
+    artist: 'TPE1',
+    album: 'TALB',
+    year: 'TYER',
+    genre: 'TCON',
+    publisher: 'TPUB',
+    copyright: 'TCOP',
+    encodedBy: 'TENC',
+    comments: 'COMM',
+    quality: 'TMED'
+  };
+  return frameMap[key];
+};
+
+const createID3v1Buffer = (metadata) => {
+  try {
+    const buffer = new ArrayBuffer(128);
+    const view = new Uint8Array(buffer);
+    
+    // ID3v1 header - "TAG"
+    view[0] = 0x54; // T
+    view[1] = 0x41; // A
+    view[2] = 0x47; // G
+    
+    const writeField = (text, start, length) => {
+      const cleaned = (text || '')
+        .replace(/[^\x20-\x7E]/g, '_')
+        .padEnd(length, ' ')
+        .slice(0, length);
+      
+      for (let i = 0; i < length; i++) {
+        view[start + i] = cleaned.charCodeAt(i);
+      }
+    };
+    
+    // Write fields
+    writeField(metadata.title, 3, 30);     // Title - 30 chars
+    writeField(metadata.artist, 33, 30);    // Artist - 30 chars
+    writeField(metadata.album, 63, 30);     // Album - 30 chars
+    writeField(metadata.year, 93, 4);       // Year - 4 chars
+    writeField(metadata.comments, 97, 30);   // Comment - 30 chars
+    view[127] = 255;                        // Genre - 255 = Unknown
+    
+    return view;
+  } catch (error) {
+    console.error('Error creating ID3v1 buffer:', error);
+    return null;
+  }
+};
 
 const Player = ({
   currentTrack = null,
@@ -180,6 +235,30 @@ const Player = ({
   const isLiked = currentTrack
     ? likedSongs.some((song) => song.id === currentTrack.id)
     : false;
+
+  const [thumbnailUrl, setThumbnailUrl] = useState(null);
+
+  useEffect(() => {
+    if (currentTrack?.image) {
+      const highestQualityImage = currentTrack.image.reduce((prev, curr) => {
+        const prevQuality = parseInt(prev.quality.split('x')[0]);
+        const currQuality = parseInt(curr.quality.split('x')[0]);
+        return currQuality > prevQuality ? curr : prev;
+      }, currentTrack.image[0]);
+      setThumbnailUrl(highestQualityImage.url);
+    } else if (currentTrack?.metadata?.thumbnailUrl) {
+      setThumbnailUrl(currentTrack.metadata.thumbnailUrl);
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if (currentTrack?.isLocal && currentTrack?.thumbnailBlob) {
+      const blob = new Blob([currentTrack.thumbnailBlob], { type: 'image/jpeg' });
+      const url = URL.createObjectURL(blob);
+      setThumbnailUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [currentTrack]);
 
   const handleTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
@@ -396,36 +475,99 @@ const Player = ({
     return () => clearInterval(interval);
   }, [timerDuration, isPlaying]);
 
-  const handleDownload = async (track) => {
+  const handleDownload = useCallback(async (track) => {
+    if (!track) return;
+    
     try {
-      const response = await fetch(track.downloadUrl[0].url);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${track.name}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      // Save downloaded song to localStorage
-      const downloadedSongs = JSON.parse(localStorage.getItem('downloadedSongs') || '[]');
-      const songExists = downloadedSongs.some(song => song.id === track.id);
+      // Get URL for selected quality
+      const selectedQualityUrl = getUrlForQuality(track.downloadUrl, downloadQuality);
       
-      if (!songExists) {
-        const songData = {
-          ...track,
-          isLocal: true,
-          downloadTime: new Date().toISOString()
-        };
-        downloadedSongs.push(songData);
-        localStorage.setItem('downloadedSongs', JSON.stringify(downloadedSongs));
+      if (!selectedQualityUrl) {
+        throw new Error('No download URL available for quality: ' + downloadQuality);
       }
+
+      // Fetch the audio file
+      const response = await fetch(selectedQualityUrl);
+      if (!response.ok) {
+        throw new Error('Failed to fetch audio file');
+      }
+      const arrayBuffer = await response.arrayBuffer();
+
+      // Clean text helper
+      const cleanText = (text) => {
+        return (text || '')
+          .replace(/[^\x20-\x7E]/g, '_')
+          .replace(/[\\/:"*?<>|]+/g, '_')
+          .slice(0, 30)
+          .trim();
+      };
+
+      // Prepare metadata
+      const metadata = {
+        title: cleanText(track.name || track.title || 'Unknown Title'),
+        artist: cleanText(track.primaryArtists || track.artists?.primary?.[0]?.name || 'Unknown Artist'),
+        album: cleanText(track.album?.name || ''),
+        year: (track.year || new Date().getFullYear()).toString().slice(0, 4),
+        comments: cleanText(downloadQuality)
+      };
+
+      // Create ID3v1 tag
+      const id3v1Buffer = createID3v1Buffer(metadata);
+      
+      if (!id3v1Buffer) {
+        throw new Error('Failed to create ID3 tags');
+      }
+
+      // Combine audio data with ID3v1 tag at the end
+      const finalBuffer = new Uint8Array(arrayBuffer.byteLength + id3v1Buffer.length);
+      finalBuffer.set(new Uint8Array(arrayBuffer), 0);
+      finalBuffer.set(id3v1Buffer, arrayBuffer.byteLength);
+
+      // Create blob with proper MIME type
+      const blob = new Blob([finalBuffer], { 
+        type: 'audio/mpeg; codecs="mp3"'
+      });
+
+      // Generate safe filename
+      const filename = `${cleanText(metadata.title)}.mp3`;
+
+      // Try using download attribute first
+      try {
+        const a = document.createElement('a');
+        const url = window.URL.createObjectURL(blob);
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } catch (error) {
+        console.warn('Standard download failed, trying alternative method:', error);
+        
+        // Fallback method for IE
+        if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+          window.navigator.msSaveOrOpenBlob(blob, filename);
+        } else {
+          // Another fallback using data URL
+          const reader = new FileReader();
+          reader.onload = function() {
+            const a = document.createElement('a');
+            a.href = reader.result;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          };
+          reader.readAsDataURL(blob);
+        }
+      }
+
+      console.log('Download completed successfully');
     } catch (error) {
       console.error('Error downloading song:', error);
+      throw error;
     }
-  };
+  }, [downloadQuality]);
 
   const playerControls = useMemo(
     () => (
@@ -541,7 +683,9 @@ const Player = ({
         <IconButton
           onClick={(e) => {
             e.stopPropagation();
-            handleDownload(currentTrack);
+            handleDownload(currentTrack).catch(error => {
+              console.error('Download failed:', error);
+            });
           }}
           sx={{ color: "white" }}
         >
@@ -585,6 +729,134 @@ const Player = ({
     ),
     [volume, isMuted]
   );
+
+  // Memoized Queue Item Component
+  const QueueItem = memo(({ song, index, onQueueItemClick }) => (
+    <Box
+      onClick={() => onQueueItemClick(song, index)}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        p: 1,
+        borderRadius: 1,
+        mb: 1,
+        cursor: "pointer",
+        "&:hover": {
+          bgcolor: "#383838",
+          transform: "scale(1.02)",
+          transition: "all 0.2s ease",
+        },
+      }}
+    >
+      <img
+        src={song.image?.[0]?.url || song.image?.[1]?.url}
+        alt={song.name}
+        style={{ width: 40, height: 40, borderRadius: 4, marginRight: 12 }}
+      />
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography variant="body2" color="white" noWrap>
+          {song.name}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" noWrap>
+          {song.primaryArtists || song.artists?.primary?.[0]?.name}
+        </Typography>
+      </Box>
+    </Box>
+  ));
+
+  // Memoized Queue List Component
+  const QueueList = memo(({ queue, onQueueItemClick }) => (
+    <Box
+      sx={{
+        overflowY: "auto",
+        maxHeight: "calc(100vh - 100px)",
+        "&::-webkit-scrollbar": {
+          width: "8px",
+        },
+        "&::-webkit-scrollbar-track": {
+          background: "#282828",
+        },
+        "&::-webkit-scrollbar-thumb": {
+          background: "#535353",
+          borderRadius: "4px",
+        },
+      }}
+    >
+      {queue.map((song, index) => (
+        <QueueItem
+          key={song.id || index}
+          song={song}
+          index={index}
+          onQueueItemClick={onQueueItemClick}
+        />
+      ))}
+    </Box>
+  ));
+
+  // Memoized Queue Drawer Component
+  const QueueDrawer = memo(({ open, onClose, queue, onQueueItemClick }) => (
+    <Drawer
+      anchor="right"
+      open={open}
+      onClose={onClose}
+      sx={{
+        zIndex: 1300,
+        "& .MuiBackdrop-root": {
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+        },
+      }}
+      PaperProps={{
+        sx: {
+          width: 350,
+          bgcolor: "#282828",
+          p: 2,
+        },
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+        }}
+      >
+        <Typography variant="h6" color="white">
+          Play Queue
+        </Typography>
+        <IconButton onClick={onClose} sx={{ color: "white" }}>
+          <Close />
+        </IconButton>
+      </Box>
+
+      {queue && queue.length > 0 ? (
+        <QueueList queue={queue} onQueueItemClick={onQueueItemClick} />
+      ) : (
+        <Typography color="text.secondary" sx={{ textAlign: "center", mt: 4 }}>
+          Queue is empty
+        </Typography>
+      )}
+    </Drawer>
+  ));
+
+  // Add PropTypes
+  QueueItem.propTypes = {
+    song: PropTypes.object.isRequired,
+    index: PropTypes.number.isRequired,
+    onQueueItemClick: PropTypes.func.isRequired,
+  };
+
+  QueueList.propTypes = {
+    queue: PropTypes.array.isRequired,
+    onQueueItemClick: PropTypes.func.isRequired,
+  };
+
+  QueueDrawer.propTypes = {
+    open: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
+    queue: PropTypes.array.isRequired,
+    onQueueItemClick: PropTypes.func.isRequired,
+  };
 
   if (!currentTrack) {
     return (
@@ -634,8 +906,6 @@ const Player = ({
           marginLeft: { xs: 0, sm: 0, md: '18%' }, // No margin for xs and sm, 15% margin for md and above
           zIndex: 1200, // Ensure player stays above other content
         }}
-        
-        
       >
         {/* Track Info */}
         <Box
@@ -648,19 +918,15 @@ const Player = ({
           }}
         >
           {currentTrack?.image && (
-            <img
-              src={
-                currentTrack.image[2]?.url ||
-                currentTrack.image[1]?.url ||
-                currentTrack.image[0]?.url
-              }
+            <Box
+              component="img"
+              src={thumbnailUrl || "/default-album-art.png"}
               alt={currentTrack.name}
-              style={{
-                width: "60px",
-                height: "60px",
-                marginRight: "2px",
-                marginLeft: "2px",
-                borderRadius: "4px",
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 1,
+                objectFit: "cover",
               }}
             />
           )}
@@ -767,7 +1033,7 @@ const Player = ({
         open={showQueue}
         onClose={handleCloseQueue}
         queue={queue}
-        onQueueItemClick={handleQueueItemClick} // Use the prop directly
+        onQueueItemClick={handleQueueItemClick}
       />
       <ExpandedPlayer
         open={isExpanded}
@@ -786,7 +1052,9 @@ const Player = ({
         sleepTimer={timerDuration}
         onSleepTimerSet={handleTimerSet}
         onQueueItemClick={onQueueItemClick}
-        onDownload={() => currentTrack && handleDownload(currentTrack)}
+        onDownload={() => currentTrack && handleDownload(currentTrack).catch(error => {
+          console.error('Download failed:', error);
+        })}
         onTimeChange={handleSliderChange}
         volume={volume}
         onVolumeChange={handleVolumeChange}
