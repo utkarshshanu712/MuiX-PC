@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -36,11 +36,11 @@ import { useTopPlaylists } from '../contexts/TopPlaylistsContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 
 const categories = [
-  { id: "trending", title: "Trending Now", query: "trending songs" },
+  { id: "trending", title: "Trending Now", query: "latest songs," },
   { id: "punjabi", title: "Punjabi Hits", query: "punjabi hits" },
-  { id: "bollywood", title: "Bollywood Hits", query: "bollywood hits" },
-  { id: "romantic", title: "Romantic Hits", query: "romantic hindi songs" },
-  { id: "party", title: "Party Hits", query: "party songs hindi" },
+  { id: "bollywood", title: "Bollywood Hits", query: "Top Bollywood Hits" },
+  { id: "romantic", title: "Romantic Hits", query: "hindi Romantic songs" },
+  { id: "old songs", title: "Old Songs", query: "old hindi songs" },
 ];
 
 const topCharts = [
@@ -411,7 +411,23 @@ const ChartCard = ({ title, chart, onSongSelect }) => {
   );
 };
 
-const ScrollableSection = ({ title, songs, onSongSelect, onLoadMore, hasMore }) => {
+const SwipeableSection = ({ title, songs, onSongSelect, onLoadMore, hasMore }) => {
+  const theme = useTheme();
+  const [currentPage, setCurrentPage] = useState(0);
+  const itemsPerPage = 20;
+
+  const handleNext = useCallback(() => {
+    setCurrentPage(prev => prev + 1);
+  }, []);
+
+  const handlePrev = useCallback(() => {
+    setCurrentPage(prev => Math.max(0, prev - 1));
+  }, []);
+
+  const startIndex = currentPage * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const visibleSongs = songs.slice(startIndex, endIndex);
+
   return (
     <Box sx={{ mb: { xs: 3, sm: 4 }, px: 1 }}>
       <Typography
@@ -433,9 +449,10 @@ const ScrollableSection = ({ title, songs, onSongSelect, onLoadMore, hasMore }) 
           gap: 2.5,
           maxWidth: '100%',
           overflowX: 'hidden',
+          position: 'relative',
         }}
       >
-        {songs.map((song) => (
+        {visibleSongs.map((song) => (
           <Box
             key={song.id}
             sx={{
@@ -445,6 +462,41 @@ const ScrollableSection = ({ title, songs, onSongSelect, onLoadMore, hasMore }) 
             <SongCard song={song} onSongSelect={onSongSelect} />
           </Box>
         ))}
+
+        {songs.length > itemsPerPage && (
+          <>
+            <IconButton
+              onClick={handlePrev}
+              disabled={currentPage === 0}
+              sx={{
+                position: 'absolute',
+                left: -20,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                bgcolor: 'background.paper',
+                '&:hover': { bgcolor: 'action.hover' },
+                visibility: currentPage === 0 ? 'hidden' : 'visible',
+              }}
+            >
+              <ChevronLeft />
+            </IconButton>
+            <IconButton
+              onClick={handleNext}
+              disabled={endIndex >= songs.length}
+              sx={{
+                position: 'absolute',
+                right: -20,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                bgcolor: 'background.paper',
+                '&:hover': { bgcolor: 'action.hover' },
+                visibility: endIndex >= songs.length ? 'hidden' : 'visible',
+              }}
+            >
+              <ChevronRight />
+            </IconButton>
+          </>
+        )}
       </Box>
 
       {hasMore && (
@@ -541,62 +593,100 @@ const Home = ({ onSongSelect, username }) => {
       width: '100%',
       maxWidth: '100vw',
     }}>
+      {/* Header section with search */}
       <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'flex-start', 
-        justifyContent: 'space-between',
-        mb: { xs: 2, sm: 4 },
-        width: '100%',
-        px: 1,
+        mb: { xs: 3, sm: 4, md: 5 },
+        background: theme.palette.mode === 'dark' 
+          ? 'linear-gradient(45deg, rgba(78,205,196,0.1), rgba(255,107,107,0.1))'
+          : 'linear-gradient(45deg, #4ECDC4, #FF6B6B)',
+        borderRadius: { xs: '0 0 24px 24px', sm: '32px' },
+        p: { xs: 3, sm: 4 },
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        <Box>
-          <Typography 
-            variant="h5"
-            component="h1" 
-            sx={{ 
-              fontSize: { xs: '1.5rem', sm: '2rem' },
-              fontWeight: 700,
-              mb: 1,
-              color: 'white',
-              ml:4
-            }}
-          >
-            Hi {username}
-          </Typography>
-          <Typography 
-            variant="subtitle1"
-            sx={{ 
-              fontSize: { xs: '0.875rem', sm: '1rem' },
-              color: 'rgba(255, 255, 255, 0.7)',
-              ml:4
-            }}
-          >
-            Discover your favorite music
-          </Typography>
-        </Box>
+        {/* Decorative Elements */}
+        <Box sx={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: '200px',
+          height: '200px',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%)',
+          transform: 'translate(30%, -30%)',
+          pointerEvents: 'none'
+        }} />
 
-        <Paper
-          onClick={() => navigate('/search')}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            bgcolor: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: '20px',
-            p: '8px 20px',
-            mt: 4,
-            mr: 1,
-            cursor: 'pointer',
-            width: { xs: '120px', sm: 'auto' },
-            '&:hover': {
-              bgcolor: 'rgba(255, 255, 255, 0.15)',
-            },
-          }}
-        >
-          <SearchIcon sx={{ color: 'white', mr: 1, fontSize: '1.5rem' }} />
-          <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.7)', display: 'block', fontSize: '1rem', }} > {isMobile ? 'Search... ' : 'What do you want to play? Search it and enjoy your Favorite music . . . . . . . . .'} </Typography>
-        </Paper>
+        <Box sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          justifyContent: 'space-between',
+          gap: 2,
+          position: 'relative',
+          zIndex: 1
+        }}>
+          <Box>
+            <Typography 
+              variant="h3" 
+              component="h1"
+              sx={{
+                fontWeight: 800,
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                color: theme.palette.mode === 'dark' ? 'white' : 'white',
+                textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                mb: 1
+              }}
+            >
+              Welcome{username ? `, ${username}` : ''}
+            </Typography>
+            <Typography 
+              variant="subtitle1"
+              sx={{ 
+                color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.8)' : 'white',
+                fontSize: { xs: '1rem', sm: '1.1rem' },
+                maxWidth: '600px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }}
+            >
+              Discover and enjoy your favorite music with our curated playlists and personalized recommendations
+            </Typography>
+          </Box>
+
+          <Paper
+            onClick={() => navigate('/search')}
+            elevation={0}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              bgcolor: 'rgba(255,255,255,0.15)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '16px',
+              p: '12px 24px',
+              cursor: 'pointer',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                bgcolor: 'rgba(255,255,255,0.25)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }
+            }}
+          >
+            <SearchIcon sx={{ color: 'white', mr: 1 }} />
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                color: 'white',
+                display: { xs: 'none', sm: 'block' }
+              }}
+            >
+              Search for music...
+            </Typography>
+          </Paper>
+        </Box>
       </Box>
 
+      {/* Top Charts section */}
       <Box sx={{ 
         mb: { xs: 3, sm: 4 },
         overflowX: 'hidden',
@@ -638,31 +728,22 @@ const Home = ({ onSongSelect, username }) => {
         </Box>
       </Box>
 
-      {recentlyPlayed.length > 0 && (
-        <Box sx={{ mt: 4 }}>
-          <Typography 
-            variant="h6"
-            sx={{ 
-              fontSize: { xs: '2rem', sm: '2.25rem' },
-              fontWeight: 600,
-              mb: { xs: 2, sm: 2.5 },
-              color: '#4DC1CC',
-            }}
-          >
-            Recently Played
-          </Typography>
-          <Grid container spacing={2}>
-            {recentlyPlayed.slice(0, 6).map((song) => (
-              <Grid item xs={6} sm={4} md={3} lg={2} key={song.id}>
-                <SongCard song={song} onSongSelect={onSongSelect} />
-              </Grid>
-            ))}
-          </Grid>
+      {/* Recently Played section */}
+      {recentlyPlayed?.length > 0 && (
+        <Box sx={{ mt: { xs: 3, sm: 4, md: 5 } }}>
+          <SwipeableSection
+            title="Recently Played"
+            songs={recentlyPlayed}
+            onSongSelect={onSongSelect}
+            onLoadMore={() => {}}
+            hasMore={false}
+          />
         </Box>
       )}
 
+      {/* Categories section */}
       {categories.map((category) => (
-        <ScrollableSection
+        <SwipeableSection
           key={category.id}
           title={category.title}
           songs={categoryData[category.id] || []}

@@ -14,8 +14,10 @@
     "@emotion/styled": "^11.14.0",
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
-    "@mui/icons-material": "^6.3.0",
-    "@mui/material": "^6.3.0",
+    "@mui/icons-material": "^6.4.1",
+    "@mui/material": "^6.4.1",
+    "@react-spring/web": "^9.7.5",
+    "@use-gesture/react": "^10.3.1",
     "axios": "^1.7.9",
     "Buffer": "^0.0.0",
     "framer-motion": "^11.16.0",
@@ -27,7 +29,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.1.1",
-    "react-swipeable": "^7.0.2"
+    "react-swipeable": "^7.0.2",
+    "swiper": "^11.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

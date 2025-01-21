@@ -68,6 +68,7 @@ const Sidebar = () => {
       path: '/liked-songs' 
     },
     { text: 'Your Library', icon: <LibraryMusic />, path: '/library' },
+    { text: 'Downloads', icon: <Download />, path: '/downloads' },
   ];
   
 

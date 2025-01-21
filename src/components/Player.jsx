@@ -3,8 +3,8 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  memo,
   useMemo,
+  memo,
 } from "react";
 import PropTypes from 'prop-types';
 import {
@@ -38,6 +38,7 @@ import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useLibrary } from "../contexts/LibraryContext";
 import { useSettings } from '../contexts/SettingsContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import PlaylistMenu from "./PlaylistMenu";
 
 // Function to create ID3v2 tag buffer
@@ -204,6 +205,90 @@ const createID3v1Buffer = (metadata) => {
   }
 };
 
+// Utility function for URL validation
+const validateAudioSource = async (url, timeout = 5000) => {
+  if (!url || typeof url !== 'string') {
+    return { valid: false, error: 'Invalid URL' };
+  }
+
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    let timeoutId;
+
+    const cleanup = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      audio.removeEventListener('canplaythrough', successHandler);
+      audio.removeEventListener('error', errorHandler);
+      audio.src = '';
+    };
+
+    const successHandler = () => {
+      cleanup();
+      resolve({ valid: true, url });
+    };
+
+    const errorHandler = (e) => {
+      cleanup();
+      resolve({ 
+        valid: false, 
+        error: e.message || 'Unknown audio source error',
+        url 
+      });
+    };
+
+    timeoutId = setTimeout(() => {
+      cleanup();
+      resolve({ valid: false, error: 'Audio source validation timed out', url });
+    }, timeout);
+
+    audio.addEventListener('canplaythrough', successHandler);
+    audio.addEventListener('error', errorHandler);
+
+    try {
+      audio.src = url;
+    } catch (err) {
+      cleanup();
+      resolve({ valid: false, error: err.message, url });
+    }
+  });
+};
+
+// MIME type detection
+const detectMimeType = (url) => {
+  const extension = url.split('.').pop().toLowerCase();
+  const mimeTypeMap = {
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'm4a': 'audio/mp4',
+    'ogg': 'audio/ogg',
+    'webm': 'audio/webm'
+  };
+  return mimeTypeMap[extension] || 'audio/mpeg';
+};
+
+// Enhanced URL selection
+const getUrlForQuality = (downloadUrls, preferredQuality = 'high') => {
+  if (!downloadUrls || !Array.isArray(downloadUrls)) return null;
+
+  const qualityPriority = [
+    preferredQuality, 
+    'high', 
+    'medium', 
+    'low'
+  ];
+
+  for (const quality of qualityPriority) {
+    const matchingUrls = downloadUrls.filter(u => u.quality === quality);
+    
+    for (const urlObj of matchingUrls) {
+      return urlObj.url;
+    }
+  }
+
+  // Fallback to first URL if no quality match
+  return downloadUrls[0]?.url || null;
+};
+
 const Player = ({
   currentTrack = null,
   onNext = () => {},
@@ -214,15 +299,21 @@ const Player = ({
   onQueueItemClick = () => {},
   onLyricsClick = () => {},
 }) => {
-  const audioRef = useRef(new Audio());
+  // Context and hooks
   const { streamingQuality, downloadQuality, getUrlForQuality } = useSettings();
   const { addToRecentlyPlayed } = useUserPreferences();
   const { likedSongs, toggleLikeSong } = useLibrary();
+  const { enqueueSnackbar } = useSnackbar();
+
+  // Refs
+  const audioRef = useRef(null);
+
+  // State management
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useLocalStorage("playerVolume", 1);
   const [isMuted, setIsMuted] = useLocalStorage("playerMuted", false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
   const [error, setError] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
@@ -259,6 +350,17 @@ const Player = ({
       return () => URL.revokeObjectURL(url);
     }
   }, [currentTrack]);
+
+  useEffect(() => {
+    audioRef.current = new Audio();
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+    };
+  }, []);
 
   const handleTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
@@ -362,54 +464,145 @@ const Player = ({
   useEffect(() => {
     if (!currentTrack) return;
 
-    const audioUrl = getUrlForQuality(currentTrack.downloadUrl, streamingQuality);
-    audioRef.current.src = audioUrl;
-    
-    if (isPlaying) {
-      audioRef.current.play().catch(error => {
-        console.error('Error playing audio:', error);
-        setError(error.message || 'Failed to play audio. Please try again.');
-        setIsPlaying(false);
-      });
-    }
+    const audio = audioRef.current;
+    let playPromise;
 
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
+    const loadAndPlayTrack = async () => {
+      try {
+        // Determine audio URL with comprehensive validation
+        let audioUrl;
+        if (currentTrack.isLocal && currentTrack.audioUrl) {
+          const localValidation = await validateAudioSource(currentTrack.audioUrl);
+          if (localValidation.valid) {
+            audioUrl = currentTrack.audioUrl;
+          }
+        }
+
+        // Fallback to download URLs
+        if (!audioUrl && currentTrack.downloadUrl) {
+          const downloadUrl = getUrlForQuality(currentTrack.downloadUrl, streamingQuality);
+          
+          if (downloadUrl) {
+            const urlValidation = await validateAudioSource(downloadUrl);
+            if (urlValidation.valid) {
+              audioUrl = downloadUrl;
+            }
+          }
+        }
+
+        // Validate and set audio source
+        if (!audioUrl) {
+          throw new Error('No valid audio source found');
+        }
+
+        // Detect and set MIME type
+        const mimeType = detectMimeType(audioUrl);
+
+        // Reset and prepare audio
+        audio.pause();
+        audio.src = audioUrl;
+        audio.type = mimeType;
+        audio.load();
+
+        // Attempt playback
+        if (isPlaying) {
+          playPromise = audio.play();
+          
+          if (playPromise !== undefined) {
+            await playPromise.catch(error => {
+              if (error.name === 'AbortError') return;
+              
+              console.error('Playback error:', error);
+              enqueueSnackbar(`Failed to play audio: ${error.message}`, { variant: 'error' });
+              setIsPlaying(false);
+              setError(error.message || 'Playback failed');
+            });
+          }
+        }
+
+        // Clear any previous errors
+        setError(null);
+
+      } catch (err) {
+        console.error('Track loading error:', err);
+        enqueueSnackbar(`Error loading track: ${err.message}`, { variant: 'error' });
+        setIsPlaying(false);
+        setError(err.message);
       }
     };
-  }, [currentTrack, streamingQuality, getUrlForQuality, isPlaying]);
 
-  useEffect(() => {
-    if (currentTrack && isPlaying) {
-      addToRecentlyPlayed(currentTrack);
-    }
-  }, [currentTrack, isPlaying, addToRecentlyPlayed]);
+    loadAndPlayTrack();
 
-  const handlePlayPause = useCallback(() => {
+    return () => {
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            if (audio) {
+              audio.pause();
+              audio.src = '';
+            }
+          })
+          .catch(() => {
+            if (audio) {
+              audio.src = '';
+            }
+          });
+      } else if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+    };
+  }, [currentTrack, streamingQuality, isPlaying, enqueueSnackbar]);
+
+  const handlePlayPause = useCallback(async () => {
     if (error) return;
 
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(error => {
-        console.error('Error playing audio:', error);
-        setError(error.message || 'Failed to play audio. Please try again.');
-      });
+    const audio = audioRef.current;
+    
+    try {
+      if (isPlaying) {
+        await audio.pause();
+      } else {
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+        }
+      }
+      setIsPlaying(!isPlaying);
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        // Ignore AbortError as it's expected when quickly switching tracks
+        return;
+      }
+      console.error('Error playing audio:', error);
+      setError(error.message || 'Failed to play audio. Please try again.');
+      setIsPlaying(false);
     }
-    setIsPlaying(!isPlaying);
   }, [error, isPlaying]);
 
   const handleVolumeChange = useCallback((event, newValue) => {
-    const volume = Math.max(0, Math.min(newValue / 100, 1));
-    setVolume(volume);
-    audioRef.current.volume = volume;
-  }, [setVolume]);
+    if (audioRef.current) {
+      audioRef.current.volume = newValue;
+      setVolume(newValue);
+      if (newValue === 0) {
+        setIsMuted(true);
+      } else if (isMuted) {
+        setIsMuted(false);
+      }
+    }
+  }, [isMuted]);
 
-  const toggleMute = useCallback(() => {
-    setIsMuted(!isMuted);
-  }, [isMuted, setIsMuted]);
+  const handleToggleMute = useCallback(() => {
+    if (audioRef.current) {
+      if (isMuted) {
+        audioRef.current.volume = volume;
+        setIsMuted(false);
+      } else {
+        audioRef.current.volume = 0;
+        setIsMuted(true);
+      }
+    }
+  }, [isMuted, volume]);
 
   useEffect(() => {
     audioRef.current.volume = isMuted ? 0 : volume;
@@ -479,11 +672,15 @@ const Player = ({
     if (!track) return;
     
     try {
+      // Show starting download notification
+      enqueueSnackbar('Starting download...', { variant: 'info' });
+
       // Get URL for selected quality
       const selectedQualityUrl = getUrlForQuality(track.downloadUrl, downloadQuality);
       
       if (!selectedQualityUrl) {
-        throw new Error('No download URL available for quality: ' + downloadQuality);
+        enqueueSnackbar('No download URL available for selected quality', { variant: 'error' });
+        return;
       }
 
       // Fetch the audio file
@@ -528,46 +725,85 @@ const Player = ({
         type: 'audio/mpeg; codecs="mp3"'
       });
 
+      // Save to downloads storage
+      const downloadData = {
+        id: track.id,
+        title: metadata.title,
+        artist: metadata.artist,
+        album: metadata.album,
+        duration: track.duration,
+        downloadDate: new Date().toISOString(),
+        audioUrl: selectedQualityUrl,
+        coverUrl: track.image?.[2]?.link || track.image?.[0]?.link,
+      };
+
+      // Get existing downloads
+      const existingDownloads = JSON.parse(localStorage.getItem('downloads') || '[]');
+      
+      // Check if song already exists
+      const songExists = existingDownloads.some(song => song.id === track.id);
+      if (!songExists) {
+        existingDownloads.push(downloadData);
+        localStorage.setItem('downloads', JSON.stringify(existingDownloads));
+      }
+
       // Generate safe filename
       const filename = `${cleanText(metadata.title)}.mp3`;
 
-      // Try using download attribute first
-      try {
-        const a = document.createElement('a');
-        const url = window.URL.createObjectURL(blob);
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } catch (error) {
-        console.warn('Standard download failed, trying alternative method:', error);
-        
-        // Fallback method for IE
-        if (window.navigator && window.navigator.msSaveOrOpenBlob) {
-          window.navigator.msSaveOrOpenBlob(blob, filename);
-        } else {
-          // Another fallback using data URL
-          const reader = new FileReader();
-          reader.onload = function() {
-            const a = document.createElement('a');
-            a.href = reader.result;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          };
-          reader.readAsDataURL(blob);
-        }
-      }
+      // Create download link
+      const a = document.createElement('a');
+      const url = window.URL.createObjectURL(blob);
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
 
-      console.log('Download completed successfully');
+      // Dispatch download complete event
+      window.dispatchEvent(new CustomEvent('downloadComplete', {
+        detail: { songId: track.id }
+      }));
+
+      enqueueSnackbar('Download completed successfully', { variant: 'success' });
     } catch (error) {
       console.error('Error downloading song:', error);
-      throw error;
+      enqueueSnackbar('Failed to download song: ' + error.message, { variant: 'error' });
     }
-  }, [downloadQuality]);
+  }, [downloadQuality, enqueueSnackbar]);
+
+  const getDisplayInfo = useCallback(() => {
+    if (!currentTrack) return null;
+
+    // For downloaded/offline tracks
+    if (currentTrack.isLocal) {
+      return {
+        title: currentTrack.title || currentTrack.name,
+        artist: currentTrack.artist || currentTrack.primaryArtists,
+        image: currentTrack.image?.[0]?.link || currentTrack.coverUrl,
+        isOffline: true
+      };
+    }
+
+    // For online tracks - get highest quality image available
+    const highQualityImage = currentTrack.image?.find(img => img.quality === '500x500')?.url ||
+                            currentTrack.image?.find(img => img.quality === '150x150')?.url ||
+                            currentTrack.image?.find(img => img.quality === '50x50')?.url;
+
+    return {
+      title: currentTrack.name || currentTrack.title,
+      artist: currentTrack.primaryArtists || currentTrack.artist || currentTrack.artists?.primary?.[0]?.name,
+      image: highQualityImage,
+      isOffline: false
+    };
+  }, [currentTrack]);
+
+  const displayInfo = getDisplayInfo();
+
+  // Early return if no track is playing
+  if (!currentTrack) {
+    return null;
+  }
 
   const playerControls = useMemo(
     () => (
@@ -699,13 +935,19 @@ const Player = ({
   const volumeControls = useMemo(
     () => (
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <IconButton sx={{ color: "white" }} onClick={toggleMute}>
-          {isMuted ? <VolumeOff /> : <VolumeUp />}
+        <IconButton onClick={handleToggleMute} size="small">
+          {isMuted || volume === 0 ? (
+            <VolumeOff sx={{ color: "white", fontSize: "1.5rem" }} />
+          ) : (
+            <VolumeUp sx={{ color: "white", fontSize: "1.5rem" }} />
+          )}
         </IconButton>
         <Slider
-          value={isMuted ? 0 : volume * 100}
+          value={isMuted ? 0 : volume}
           onChange={handleVolumeChange}
-          aria-label="Volume"
+          min={0}
+          max={1}
+          step={0.01}
           sx={{
             width: 100,
             color: "white",
@@ -716,11 +958,8 @@ const Player = ({
               width: 12,
               height: 12,
               backgroundColor: "#fff",
-              "&:before": {
-                boxShadow: "0 4px 8px rgba(0,0,0,0.4)",
-              },
-              "&:hover, &.Mui-focusVisible, &.Mui-active": {
-                boxShadow: "none",
+              "&:hover, &.Mui-focusVisible": {
+                boxShadow: "0px 0px 0px 8px rgba(255, 255, 255, 0.16)",
               },
             },
           }}
@@ -858,28 +1097,6 @@ const Player = ({
     onQueueItemClick: PropTypes.func.isRequired,
   };
 
-  if (!currentTrack) {
-    return (
-      <Box
-        sx={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          bgcolor: "#282828",
-          p: 2,
-          height: "90px",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          No track selected
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
     <>
       <Box
@@ -913,56 +1130,65 @@ const Player = ({
             width: { xs: "35%", sm: "30%" },
             display: "flex",
             alignItems: "center",
-            gap: { xs: 2, sm: 2, md: 0 }, 
+            gap: 2,
             overflow: "hidden"
           }}
         >
-          {currentTrack?.image && (
+          {displayInfo?.image && (
             <Box
               component="img"
-              src={thumbnailUrl || "/default-album-art.png"}
-              alt={currentTrack.name}
+              src={displayInfo.image}
+              alt={displayInfo.title}
               sx={{
                 width: 48,
                 height: 48,
                 borderRadius: 1,
                 objectFit: "cover",
+                flexShrink: 0
               }}
             />
           )}
           <Box sx={{ 
-            ml: currentTrack?.image ? 0 : 2,
-            overflow: "hidden",
-            whiteSpace: "nowrap",
-            textOverflow: "ellipsis"
+            minWidth: 0,
+            flex: 1
           }}>
-            <Typography 
-              variant="subtitle1" 
-              color="white"
+            <Box sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1
+            }}>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  color: "white",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {displayInfo?.title}
+              </Typography>
+              {displayInfo?.isOffline && (
+                <Download
+                  sx={{
+                    fontSize: 16,
+                    color: "#1db954",
+                    flexShrink: 0
+                  }}
+                />
+              )}
+            </Box>
+            <Typography
+              variant="body2"
               sx={{
-                fontSize: { xs: "0.875rem", sm: "1rem" },
+                color: "text.secondary",
                 overflow: "hidden",
-                textOverflow: "ellipsis"
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
               }}
             >
-              {currentTrack?.name}
+              {displayInfo?.artist}
             </Typography>
-            <Typography 
-              variant="body2" 
-              color="text.secondary"
-              sx={{
-                fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                overflow: "hidden",
-                textOverflow: "ellipsis"
-              }}
-            >
-              {currentTrack?.primaryArtists ||
-                currentTrack?.artists?.primary?.[0]?.name}
-            </Typography>
-          </Box>
-          {/* Only show track controls on larger screens */}
-          <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: 1 }}>
-            {trackControls}
           </Box>
         </Box>
 
@@ -1059,7 +1285,7 @@ const Player = ({
         volume={volume}
         onVolumeChange={handleVolumeChange}
         isMuted={isMuted}
-        onToggleMute={toggleMute}
+        onToggleMute={handleToggleMute}
       >
         {playerControls}
       </ExpandedPlayer>

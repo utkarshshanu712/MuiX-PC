@@ -1,23 +1,23 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const UserPreferencesContext = createContext();
 
 export const languages = [
-  'Hindi',
-  'English',
-  'Mix',
-  'Punjabi',
-  'Bhojpuri',
-  'Haryanvi',
-  'Rajasthani',
-  'Tamil',
-  'Telugu',
-  'Malayalam',
-  'Kannada',
-  'Bengali',
-  'Gujarati',
-  'Marathi',
-  'Odia'
+  { value: 'english', label: 'English' },
+  { value: 'hindi', label: 'Hindi' },
+  { value: 'punjabi', label: 'Punjabi' },
+  { value: 'mix', label: 'Mix' },
+  { value: 'bhojpuri', label: 'Bhojpuri' },
+  { value: 'haryanvi', label: 'Haryanvi' },
+  { value: 'rajasthani', label: 'Rajasthani' },
+  { value: 'tamil', label: 'Tamil' },
+  { value: 'telugu', label: 'Telugu' },
+  { value: 'malayalam', label: 'Malayalam' },
+  { value: 'kannada', label: 'Kannada' },
+  { value: 'bengali', label: 'Bengali' },
+  { value: 'gujarati', label: 'Gujarati' },
+  { value: 'marathi', label: 'Marathi' },
+  { value: 'odia', label: 'Odia' }
 ];
 
 export const useUserPreferences = () => {
@@ -30,21 +30,46 @@ export const useUserPreferences = () => {
 
 export const UserPreferencesProvider = ({ children }) => {
   const [selectedLanguage, setSelectedLanguage] = useState(() => {
-    const saved = localStorage.getItem('preferredLanguage');
-    return saved || 'Mix';
+    return localStorage.getItem('preferredLanguage') || 'english';
   });
 
   const [recentlyPlayed, setRecentlyPlayed] = useState(() => {
-    const saved = localStorage.getItem('recentlyPlayed');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('recentlyPlayed');
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('Error loading recently played:', error);
+      localStorage.removeItem('recentlyPlayed');
+      return [];
+    }
   });
 
-  const addToRecentlyPlayed = useCallback((song) => {
-    setRecentlyPlayed(prev => {
-      const filtered = prev.filter(s => s.id !== song.id);
-      return [song, ...filtered].slice(0, 20);
-    });
-  }, []);
+  const addToRecentlyPlayed = (song) => {
+    if (!song?.id) return;
+    
+    try {
+      setRecentlyPlayed(prevSongs => {
+        // Remove the song if it already exists
+        const filteredSongs = prevSongs.filter(s => s.id !== song.id);
+        // Add the song to the beginning and limit to 20 songs
+        const newSongs = [song, ...filteredSongs].slice(0, 20);
+        // Update localStorage
+        localStorage.setItem('recentlyPlayed', JSON.stringify(newSongs));
+        return newSongs;
+      });
+    } catch (error) {
+      console.error('Error adding song to recently played:', error);
+    }
+  };
+
+  const clearRecentlyPlayed = () => {
+    try {
+      setRecentlyPlayed([]);
+      localStorage.removeItem('recentlyPlayed');
+    } catch (error) {
+      console.error('Error clearing recently played:', error);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('preferredLanguage', selectedLanguage);
@@ -59,6 +84,7 @@ export const UserPreferencesProvider = ({ children }) => {
     setSelectedLanguage,
     recentlyPlayed,
     addToRecentlyPlayed,
+    clearRecentlyPlayed,
     languages
   };
 

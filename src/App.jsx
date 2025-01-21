@@ -18,12 +18,15 @@ import TopPlaylists from './pages/TopPlaylists';
 import TopPlaylistDetails from './pages/TopPlaylistDetails';
 import ForYou from './pages/ForYou';
 import CreatePlaylist from './pages/CreatePlaylist';
+import Downloads from "./pages/Downloads";
 import { TopPlaylistsProvider } from './contexts/TopPlaylistsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { LibraryProvider } from "./contexts/LibraryContext";
 import { ArtistProvider } from './contexts/ArtistContext';
 import { AudioProvider } from './contexts/AudioContext';
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext';
+import { SnackbarProvider } from './contexts/SnackbarContext';
+import { DownloadsAudioProvider, useDownloadsAudio } from './contexts/DownloadsAudioContext';
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
@@ -53,49 +56,42 @@ const darkTheme = createTheme({
 });
 
 function AppContent() {
+  const { isDownloadsActive } = useDownloadsAudio();
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isForYouPage = location.pathname === '/for-you';
+  const drawerWidth = 240;
   const [navigationKey, setNavigationKey] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
+  const isForYouPage = location.pathname === '/for-you';
 
   // Reset navigation state when location changes
   useEffect(() => {
-    if (isNavigating) return; // Prevent multiple navigation attempts
+    if (isNavigating) return;
     
     setIsNavigating(true);
     const timer = setTimeout(() => {
       setIsNavigating(false);
       setNavigationKey(prev => prev + 1);
-      // Force scroll to top on navigation
       window.scrollTo(0, 0);
     }, 50);
 
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  // Prevent navigation when already navigating
+  // Handle audio cleanup when navigating to For You page
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      localStorage.setItem('lastPath', location.pathname);
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [location.pathname]);
-
-  // Handle back/forward browser buttons
-  useEffect(() => {
-    const handlePopState = () => {
-      if (!isNavigating) {
-        setNavigationKey(prev => prev + 1);
+    if (isForYouPage && currentTrack) {
+      const audio = document.querySelector('audio');
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
       }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [isNavigating]);
+      setCurrentTrack(null);
+      setQueue([]);
+      setPlayHistory([]);
+    }
+  }, [isForYouPage]);
 
   const [username, setUsername] = useState(
     localStorage.getItem("username") || ""
@@ -252,19 +248,27 @@ function AppContent() {
   }, [queue.length]);
 
   const handleSongSelect = useCallback(async (song, queueSongs = []) => {
+    // Don't play music on For You page
+    if (isForYouPage) return;
+
     // If song is already playing, do nothing
     if (currentTrack?.id === song.id) return;
+
+    // Pause any existing audio before setting new track
+    const audio = document.querySelector('audio');
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
 
     // Update current track
     setCurrentTrack(song);
 
     // Handle queue management
     if (queueSongs.length > 0) {
-      // If queueSongs is provided, use it as the new queue
       const newQueue = queueSongs.filter(s => s.id !== song.id);
       setQueue(newQueue);
     } else {
-      // If song is not in a playlist, don't create a new queue
       setQueue([]);
     }
 
@@ -283,7 +287,7 @@ function AppContent() {
     } catch (error) {
       console.error('Error fetching lyrics:', error);
     }
-  }, [currentTrack, fetchLyrics]);
+  }, [currentTrack, isForYouPage]);
 
   const handleQueueItemClick = useCallback((song, index) => {
     if (!song) return;
@@ -354,16 +358,12 @@ function AppContent() {
   }
 
   return (
-    <Box sx={{ height: '100vh', bgcolor: 'background.default', color: 'text.primary' }}>
-      <main style={{ 
-        height: isForYouPage ? '100vh' : 'calc(100vh - 90px)', 
-        overflow: 'auto',
-        position: 'relative'
-      }}>
-        <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-          <Box sx={{ flex: 1, display: "flex", overflow: "hidden" }}>
-            <Sidebar appName="MuiX" username={username} />
-            <Box
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <CssBaseline />
+      
+      <Sidebar appName="MuiX" username={username} />
+
+      <Box
               component="main"
               sx={{
                 flex: 1,
@@ -373,50 +373,41 @@ function AppContent() {
                 bgcolor: "#121212",
               }}
             >
-              <Routes key={navigationKey}>
-                <Route path="/" element={<Home onSongSelect={handleSongSelect} username={username} />} />
-                <Route path="/for-you" element={<ForYou />} />
-                <Route path="/library" element={<Library />} />
-                <Route path="/create-playlist" element={<CreatePlaylist />} />
-                <Route path="/search" element={<Search onSongSelect={handleSongSelect} />} />
-                <Route path="/playlist/:url" element={<Playlist onSongSelect={handleSongSelect} />} />
-                <Route path="/liked-songs" element={<LikedSongs onSongSelect={handleSongSelect} />} />
-                <Route path="/artist/:id" element={<Artist onSongSelect={handleSongSelect} />} />
-                <Route path="/album/:id" element={<Album onSongSelect={handleSongSelect} />} />
-                <Route path="/top-artists" element={<TopArtists />} />
-                <Route path="/following" element={<Following />} />
-                <Route path="/top-playlists" element={<TopPlaylists />} />
-                <Route path="/playlist/top/:id" element={<TopPlaylistDetails onSongSelect={handleSongSelect} />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
-            </Box>
-          </Box>
-          {!isForYouPage && (
-            <Box
-              sx={{
-                position: "sticky",
-                bottom: 0,
-                bgcolor: "#282828",
-                borderTop: "1px solid #404040",
-                zIndex: 10,
-              }}
-            >
-              <Player
-                currentTrack={currentTrack}
-                onNext={handleNext}
-                onPrevious={handlePrevious}
-                hasNext={queue.length > 0}
-                hasPrevious={playHistory.length > 0}
-                queue={queue}
-                onQueueItemClick={handleQueueItemClick}
-                onReorderQueue={handleReorderQueue}
-              />
-            </Box>
-          )}
-          <BottomNav />
-        </Box>
-      </main>
-      {!isForYouPage && <Player />}
+        <Routes key={navigationKey}>
+          <Route path="/" element={<Home onSongSelect={handleSongSelect} username={username} />} />
+          <Route path="/for-you" element={<ForYou />} />
+          <Route path="/downloads" element={<Downloads />} />
+          <Route path="/library" element={<Library />} />
+          <Route path="/create-playlist" element={<CreatePlaylist />} />
+          <Route path="/search" element={<Search onSongSelect={handleSongSelect} />} />
+          <Route path="/playlist/:url" element={<Playlist onSongSelect={handleSongSelect} />} />
+          <Route path="/liked-songs" element={<LikedSongs onSongSelect={handleSongSelect} />} />
+          <Route path="/artist/:id" element={<Artist onSongSelect={handleSongSelect} />} />
+          <Route path="/album/:id" element={<Album onSongSelect={handleSongSelect} />} />
+          <Route path="/top-artists" element={<TopArtists />} />
+          <Route path="/following" element={<Following />} />
+          <Route path="/top-playlists" element={<TopPlaylists />} />
+          <Route path="/playlist/top/:id" element={<TopPlaylistDetails onSongSelect={handleSongSelect} />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </Box>
+
+      {/* Bottom Navigation for Mobile */}
+      {isMobile && !isForYouPage && <BottomNav />}
+
+      {/* Audio Players */}
+      {!isDownloadsActive && !isForYouPage && (
+        <Player
+          currentTrack={currentTrack}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          hasNext={queue.length > 0}
+          hasPrevious={playHistory.length > 0}
+          queue={queue}
+          onQueueItemClick={handleQueueItemClick}
+          onReorderQueue={handleReorderQueue}
+        />
+      )}
     </Box>
   );
 }
@@ -425,20 +416,23 @@ function App() {
   return (
     <Router>
       <ThemeProvider theme={darkTheme}>
-        <CssBaseline />
-        <UserPreferencesProvider>
-          <ArtistProvider>
-            <LibraryProvider>
-              <SettingsProvider>
-                <AudioProvider>
-                  <TopPlaylistsProvider>
-                    <AppContent />
-                  </TopPlaylistsProvider>
-                </AudioProvider>
-              </SettingsProvider>
-            </LibraryProvider>
-          </ArtistProvider>
-        </UserPreferencesProvider>
+        <SnackbarProvider>
+          <UserPreferencesProvider>
+            <ArtistProvider>
+              <LibraryProvider>
+                <SettingsProvider>
+                  <AudioProvider>
+                    <DownloadsAudioProvider>
+                      <TopPlaylistsProvider>
+                        <AppContent />
+                      </TopPlaylistsProvider>
+                    </DownloadsAudioProvider>
+                  </AudioProvider>
+                </SettingsProvider>
+              </LibraryProvider>
+            </ArtistProvider>
+          </UserPreferencesProvider>
+        </SnackbarProvider>
       </ThemeProvider>
     </Router>
   );
