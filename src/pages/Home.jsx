@@ -672,16 +672,28 @@ const Home = ({ onSongSelect, username }) => {
               }
             }}
           >
-            <SearchIcon sx={{ color: 'white', mr: 1 }} />
-            <Typography 
-              variant="body1" 
-              sx={{ 
-                color: 'white',
-                display: { xs: 'none', sm: 'block' }
-              }}
-            >
-              Search for music...
-            </Typography>
+            <Box 
+  sx={{
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: { xs: '120%', sm: '70%' },
+    minWidth: { xs: '290px', sm: '600px' },
+    margin: '0 auto'
+  }}
+>
+  <SearchIcon sx={{ color: 'white', mr: 1 }} />
+  <Typography 
+    variant="body1" 
+    sx={{ 
+      color: 'white', 
+      display: { xs: 'block', sm: 'block' }
+    }}
+  >
+    Search for music...
+  </Typography>
+</Box>
+
           </Paper>
         </Box>
       </Box>
