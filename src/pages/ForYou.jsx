@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, IconButton, CircularProgress, Chip, Stack, Menu, MenuItem } from '@mui/material';
+import { Box, Typography, IconButton, CircularProgress, Chip, Stack, Menu, MenuItem, Snackbar, Alert } from '@mui/material';
 import { 
   Favorite, FavoriteBorder, PlayArrow, Pause, 
   PlaylistAdd, ArrowBack, Timer, MoreVert,
-  Download 
+  Download, 
+  Today
 } from '@mui/icons-material';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,40 +18,32 @@ const categories = [
     name: 'Daily Mix',
     color: '#1DB954',
     queries: [
-      'Featured Playlists', 'Recommended for today', 'trending songs', 'popular songs', 'top charts', 'Mix',
-      'new releases', 'hot tracks', 'top hits', 'latest songs', 'music mix', 'best of the week',
-      'editors picks', 'recommended for you', 'must-listen', 'top 100 songs',
-      'Pyaar', 'Dil', 'Dard', 'Ishq', 'Mohabbat', 'Judaai', 'Bewafa', 'Dhoka',
-      'Yaadein', 'Intezaar', 'Tanhai', 'Romantic', 'Love Songs Hindi', 'Hindi Hits',
-      'Bollywood Romance', 'Hindi Love Mix', 'Sad Love Songs Hindi',
-      'Bollywood', 'Hindi', 'Indian', 'Desi', 'Bollywood Hits', 'Hindi Songs',
-      'Indian Music', 'Desi Music', 'Bollywood Music', 'Hindi Music',
+     "latest songs,",
+  "punjabi hits" ,
+ "Top Bollywood Hits" , "Today",
+   'Featured Playlists', 'Recommended for today', 'New Releases', 'popular songs', 'top charts', 
+      'new releases', 'hot tracks', 'top hits', 'latest songs',  'best of the week',
+      'editors picks', 'recommended for you',  'top 100 songs',
+      , 'Bollywood Hits', 'Hindi Songs',
       'Arijit Singh', 'Shreya Ghoshal', 'Atif Aslam', 'A. R. Rahman', 'Mohit Chauhan',
       'Sunidhi Chauhan', 'Kumar Sanu', 'Alka Yagnik', 'Udit Narayan', 'Sonu Nigam',
       'Shankar Mahadevan', 'Kailash Kher', 'Javed Ali', 'KK', 'Rahat Fateh Ali Khan',
-      'Mika Singh', 'Himesh Reshammiya', 'Yo Yo Honey Singh', 'Badshah', 'Diljit Dosanjh',
+      'Mika Singh', 'Himesh Reshammiya', 'Badshah', 'Diljit Dosanjh',
       'Guru Randhawa', 'Neha Kakkar', 'Arijit Singh', 'Shreya Ghoshal', 'Atif Aslam',
       'A. R. Rahman', 'Mohit Chauhan', 'Sunidhi Chauhan', 'Kumar Sanu', 'Alka Yagnik',
       'Udit Narayan', 'Sonu Nigam', 'Shankar Mahadevan', 'Kailash Kher', 'Javed Ali',
       'KK', 'Rahat Fateh Ali Khan', 'Mika Singh', 'Himesh Reshammiya', 'Yo Yo Honey Singh',
-    
-    ' hit songs 2024', ' viral songs', ' trending songs',
-    ' dj songs 2024', ' remix songs', ' party songs',
-    ' romantic songs', ' love songs', ' sad songs',
-    ' album songs', ' film songs', ' movie songs',
-    ' stage show', ' live show', ' dance songs',
-   'punjabi songs', 'latest punjabi songs', 'punjabi hits', 'new punjabi songs',
+      'Badshah', 'Diljit Dosanjh', 'Guru Randhawa', 'Neha Kakkar', 'Arijit Singh',
+    ' hit songs 2024',"Popular" , ' new songs 2024','New songs',"New releases",
+   'punjabi songs', 'latest punjabi songs', 'new punjabi songs',
     'popular punjabi songs', 'trending punjabi songs', 'punjabi party songs',
-    'punjabi folk songs', 'punjabi pop songs', 'punjabi viral songs',
+   'punjabi pop songs', 'punjabi  songs',
     'punjabi bhangra', 'punjabi trending', 'punjabi popular', 'punjabi new releases',    'hindi songs', 'bollywood songs', 'latest hindi songs', 'hindi hits',
     'bollywood hits', 'hindi top songs', 'new hindi songs', 'popular hindi songs',
     'trending hindi songs', 'hindi romantic songs', 'hindi party songs',
-    'hindi classics', 'old hindi songs', 'hindi film songs', 'hindi movie songs',
-    'hindi pop songs', 'hindi indie songs', 'hindi viral songs',
-    'hindi trending', 'hindi popular', 'hindi new releases',    'rajasthani songs', 'latest rajasthani songs', 'rajasthani hits',
-    'new rajasthani songs', 'popular rajasthani songs', 'trending rajasthani songs',
-    'rajasthani folk songs', 'rajasthani pop songs', 'rajasthani viral songs',
-    'rajasthani trending', 'rajasthani popular', 'rajasthani new releases'
+    'hindi classics', 'hindi film songs', 'hindi movie songs',
+    'hindi pop songs', 'hindi indie songs', 'hindi songs',
+    'hindi trending', 'hindi popular', 'hindi new releases',"Coldplay", "Taylor Swift", "The Weeknd", "Billie Eilish", "Justin Bieber", "Katy Perry", "Lady Gaga", "Rihanna", "Drake", "Shakira",
     ]
   },
   {
@@ -111,7 +104,7 @@ const categories = [
       'nightlife anthems', 'party mix', 'high energy party songs', 'party classics',
       'Daru', 'Sharabi', 'Punjabi Party', 'Dance Hits Hindi', 'Club Mix Hindi',
       'Pyaar', 'Dil', 'Dard', 'Ishq', 'Mohabbat', 'Judaai', 'Bewafa', 'Dhoka',
-      'Yaadein', 'Intezaar', 'Tanhai', 'Romantic', 'Love Songs Hindi', 'Hindi Hits'
+      'Yaadein', 'Intezaar', 'Tanhai', 'Romantic', 'Love Songs Hindi', 'Hindi Hits',"Distrack"
     ]
   },
   {
@@ -122,7 +115,7 @@ const categories = [
       'fitness tracks', 'workout anthems', 
       'cardio music', 'workout playlist', 'Josh', 'Power', 'Energy Hindi Songs',
       'Pyaar', 'Josh', 'Power', 'Energy', 'Tension', 'Tension Songs Hindi','Energy Hindi Songs', 'Punjabi Workout', 
-      'Haryanvi Fitness', 'Punjabi High Energy',  'Haryanvi Cardio'
+      'Haryanvi Fitness', 'Punjabi High Energy',  'Haryanvi Cardio',"Honey Singh"
     ]
   }
 ];
@@ -524,6 +517,8 @@ const ForYou = () => {
   const [currentQuery, setCurrentQuery] = useState('');
   const [lastQuery, setLastQuery] = useState('');
   const [queryHistory, setQueryHistory] = useState([]);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
   const audioRef = useRef(new Audio());
   const { addToLibrary, removeFromLibrary, isInLibrary, playlists, addToPlaylist } = useLibrary();
   const { streamingQuality, getUrlForQuality } = useSettings();
@@ -764,6 +759,15 @@ const ForYou = () => {
     }
   }, [currentTrack]);
 
+  useEffect(() => {
+    // Check if this is the first time loading songs and snackbar hasn't been shown
+    if (songs.length > 0 && !localStorage.getItem('swipeDownTip')) {
+      setSnackbarMessage('Swipe down to play songs!');
+      setSnackbarOpen(true);
+      localStorage.setItem('swipeDownTip', 'true');
+    }
+  }, [songs]);
+
   return (
     <Box sx={{ height: '100vh', overflow: 'hidden', bgcolor: '#121212', position: 'relative' }}>
       {/* Categories */}
@@ -837,6 +841,27 @@ const ForYou = () => {
           {error}
         </Typography>
       )}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={10000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{
+          '@media (min-width: 600px)': {
+            width: '500px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            top: '10%',
+          },
+          '& .MuiSnackbarContent-root': {
+            minWidth: '300px',
+            width: '100%',
+            fontSize: '1rem',
+            justifyContent: 'center',
+          }
+        }}
+      />
     </Box>
   );
 };

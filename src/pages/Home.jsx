@@ -19,6 +19,7 @@ import {
   Button,
   InputBase,
   Paper,
+  Snackbar
 } from "@mui/material";
 import { 
   ChevronLeft, 
@@ -522,9 +523,713 @@ const Home = ({ onSongSelect, username }) => {
   const [loading, setLoading] = useState({});
   const [pages, setPages] = useState({});
   const [hasMore, setHasMore] = useState({});
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarStyle, setSnackbarStyle] = useState({
+    width: '600px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    top: '5%'
+  });
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
+
+  // Expanded music messages with 100+ unique quotes
+  const musicMessages = [
+    // Previous quotes remain the same, now adding 100 more
+
+    // Zen and Music Quotes
+    `🎵 Music is meditation,
+    Rhythm is breath,
+    Find your inner peace. 🧘‍♀️`,
+    
+    `🎶 In the symphony of chaos,
+    Find your calm melody,
+    Stay centered. 🌊`,
+    
+    `🎼 Silence between notes
+    Is where true music
+    Finds its voice. 🤫`,
+
+    // Technology and Music Quotes
+    `🎧 Digital beats,
+    Analog souls,
+    Music bridges worlds. 🌐`,
+    
+    `🎵 Algorithms create playlists,
+    But emotions
+    Choose the song. 💖`,
+    
+    `🎶 Technology amplifies,
+    But passion
+    Composes. 🎹`,
+
+    // Emotional Depth Quotes
+    `🎼 Some songs are memories,
+    Some memories are songs,
+    Keep them alive. 💭`,
+    
+    `🎧 Lyrics are unspoken words,
+    Melodies are hidden feelings,
+    Music understands. 💕`,
+    
+    `🎵 Every heartbreak
+    Has a soundtrack,
+    Healing happens. 🌈`,
+
+    // Cultural Fusion Quotes
+    `🎶 Music knows no borders,
+    No language,
+    Pure connection. 🤝`,
+    
+    `🎼 Rhythms from different lands,
+    Harmonies of humanity,
+    One world. 🌍`,
+    
+    `🎧 Traditional beats,
+    Modern interpretations,
+    Timeless art. 🎨`,
+
+    // Personal Growth Quotes
+    `🎵 Your playlist
+    Is a map of your journey,
+    Keep exploring. 🗺️`,
+    
+    `🎶 Change your music,
+    Change your mood,
+    Change yourself. 🔄`,
+    
+    `🎼 Lyrics are lessons,
+    Beats are teachers,
+    Learn constantly. 📚`,
+
+    // Nature and Music Quotes
+    `🎧 Music is like wind,
+    Invisible yet powerful,
+    Touching souls. 🍃`,
+    
+    `🎵 Ocean waves are rhythms,
+    Forest sounds are melodies,
+    Nature composes. 🌳`,
+    
+    `🎶 Birdsong at dawn,
+    Crickets at night,
+    Earth's playlist. 🌞`,
+
+    // Philosophical Music Quotes
+    `🎼 Music is time captured,
+    Emotions preserved,
+    Memories crystallized. ⏳`,
+    
+    `🎧 Notes are moments,
+    Silence is reflection,
+    Music is life. 💫`,
+    
+    `🎵 Beyond words,
+    Beyond thoughts,
+    Pure vibration. 🌠`,
+
+    // Creativity and Inspiration
+    `🎶 Every song is a story,
+    Every artist a narrator,
+    Keep creating. 🖌️`,
+    
+    `🎼 Creativity flows
+    Like an endless melody,
+    Never stop. 🌊`,
+    
+    `🎧 Inspiration is music,
+    Waiting to be heard,
+    Listen closely. 👂`,
+
+    // Resilience and Music
+    `🎵 When words break,
+    Music bends,
+    But never shatters. 💪`,
+    
+    `🎶 Rhythm is resistance,
+    Melody is hope,
+    Keep moving. 🚀`,
+    
+    `🎼 Broken hearts
+    Make the most
+    Beautiful songs. 💖`,
+
+    // Mindfulness Quotes
+    `🎧 Be present
+    In each note,
+    In each breath. 🧘‍♂️`,
+    
+    `🎵 Music is now,
+    This moment,
+    Pure awareness. ✨`,
+    
+    `🎶 Listen beyond hearing,
+    Feel beyond touching,
+    Music transcends. 🌈`,
+
+    // Dreams and Aspirations
+    `🎼 Your dreams
+    Have a soundtrack,
+    Play it loud. 🔊`,
+    
+    `🎧 Every great journey
+    Begins with a song,
+    Start singing. 🎤`,
+    
+    `🎵 Melodies are blueprints,
+    Rhythms are steps,
+    Build your future. 🏗️`,
+
+    // Emotional Intelligence
+    `🎶 Music reads emotions
+    Before you understand them,
+    Listen deeply. 💡`,
+    
+    `🎼 Some songs heal,
+    Some songs hurt,
+    Choose wisely. ⚖️`,
+    
+    `🎧 Emotional depth
+    Is measured in
+    Musical moments. 💕`,
+
+    // Interconnectedness
+    `🎵 We are all
+    Part of one
+    Great symphony. 🌐`,
+    
+    `🎶 Different instruments,
+    Same orchestra,
+    Harmony prevails. 🤝`,
+    
+    `🎼 Your unique sound
+    Completes the
+    Universal melody. 🌈`,
+
+    // Self-Discovery
+    `🎧 Music reveals
+    What silence
+    Keeps hidden. 🔍`,
+    
+    `🎵 Your favorite song
+    Is a mirror
+    Of your soul. 💫`,
+    
+    `🎶 Listen to music
+    To understand
+    Yourself better. 🌟`,
+
+    // Motivation and Empowerment
+    `🎼 Your life
+    Is your playlist,
+    Curate carefully. 📋`,
+    
+    `🎧 Some days are bass,
+    Some are treble,
+    Balance is key. ⚖️`,
+    
+    `🎵 Turn up the volume
+    Of your potential,
+    Silence the doubts. 🔊`,
+
+    // Spiritual Connections
+    `🎶 Music is prayer
+    Without words,
+    Pure devotion. 🙏`,
+    
+    `🎼 Vibrations connect
+    Beyond physical realm,
+    Feel the energy. ✨`,
+    
+    `🎧 Rhythm is breath,
+    Melody is spirit,
+    Music is sacred. 💖`,
+
+    // Innovation and Creativity
+    `🎵 Break the rules
+    Of musical tradition,
+    Create your genre. 🎸`,
+    
+    `🎶 Innovation sounds
+    Like a melody
+    No one's heard before. 🚀`,
+    
+    `🎼 Your unique sound
+    Is your greatest
+    Contribution. 🌟`,
+
+    // Emotional Resilience
+    `🎧 When words fail,
+    Music speaks
+    The unspeakable. 💬`,
+    
+    `🎵 Healing happens
+    In musical
+    Frequencies. 🌈`,
+    
+    `🎶 Embrace your pain,
+    Transform it
+    Into a song. 🎤`,
+
+    // Cultural Appreciation
+    `🎼 Music bridges
+    Cultural divides,
+    Universal language. 🌍`,
+    
+    `🎧 Every rhythm
+    Tells a story
+    Of its origin. 📖`,
+    
+    `🎵 Respect the roots,
+    Celebrate the
+    Musical diversity. 🌐`,
+
+    // Personal Empowerment
+    `🎶 Your voice
+    Is an instrument,
+    Play it proudly. 🎤`,
+    
+    `🎼 Confidence sounds
+    Like a perfectly
+    Tuned melody. 💫`,
+    
+    `🎧 Be the composer
+    Of your life's
+    Greatest symphony. 🌟`,
+
+    `🎶 Your voice
+  Is an instrument,
+  Play it proudly. 🎤`,
+  
+`🎼 Confidence sounds
+  Like a perfectly
+  Tuned melody. 💫`,
+
+`🎧 Be the composer
+  Of your life's
+  Greatest symphony. 🌟`,
+
+`🎶 Find your rhythm,
+  Let the world hear your song. 🎤`,
+  
+`🎼 Boldly play
+  The music of your soul. 🎶`,
+
+`🎧 Sing your heart out
+  And let your spirit soar. 🌟`,
+
+`🎵 Every note you hit
+  Is a step to finding your harmony. 💫`,
+
+`🎤 Let the melody
+  Of your voice echo
+  Through the universe. 🌌`,
+
+`🎶 Confidence is your music,
+  Let it play on and on. 🎼`,
+
+`🌟 Your laughter is
+  The sweetest symphony. 🎶`,
+
+`🎧 Let the music
+  Of your dreams guide your steps. 🎵`,
+
+`🎤 Dance to the beat
+  Of your own drum. 💃🏽`,
+
+`🎵 Embrace the notes
+  That make you, you. 🌟`,
+
+`🎶 Your presence is a symphony
+  In the making. 🎤`,
+
+`🎼 Harmonize with the melodies
+  Of kindness. 🎶`,
+
+`🎧 Let your smile be
+  The crescendo of your day. 💫`,
+
+`🎤 In every silence,
+  There's a song waiting. 🌟`,
+
+`🎵 Your voice can light up
+  The darkest nights. 🕯️`,
+
+`🎼 Compose your life
+  With love and joy. 🎷`,
+
+`🎶 Sing loudly, dream fiercely. 🌌`,
+
+`🎧 Your heart is a maestro,
+  Trust its rhythm. 🎵`,
+
+`🎤 Let your spirit resonate
+  With hope. 💫`,
+
+`🎼 Every heartbeat is a beat
+  Of your life's music. 🌟`,
+
+`🎶 Dance through challenges
+  With grace. 💃🏽`,
+
+`🎧 Weave your voice
+  Into the tapestry of life. 🎵`,
+
+`🎤 Sing through the rain,
+  Rejoice in the sun. ☔🌞`,
+
+`🎼 Your joy is the overture
+  Of your journey. 🎶`,
+
+`🎵 Let the world hear
+  Your unique melody. 🌏`,
+
+`🎶 Echoes of your laughter
+  Carry love. 🌸`,
+
+`🎧 Every word you say
+  Is part of a masterpiece. 🎨`,
+
+`🎤 Celebrate each moment
+  Like a musical note. 🎼`,
+
+`🎵 Let harmony be
+  The foundation of your life. 🎶`,
+
+`🌟 Voice your dreams,
+  And let them soar. 🎧`,
+
+`🎤 Sing out the beauty
+  Within you. 🎵`,
+
+`🎼 Create a symphony
+  Of joy and peace. 🎶`,
+
+`🎧 Embrace the rhythm
+  Of your authentic self. 🥁`,
+
+`🎤 Share your song
+  With the world. 🌟`,
+
+`🎶 Fill your life
+  With songs of gratitude. 💫`,
+
+`🎼 Love is the music
+  That binds us all. 🌻`,
+
+`🎤 Your dreams are a
+  Beautiful melody. 🎵`,
+
+`🎧 Let kindness be
+  Your constant chorus. 🎼`,
+
+`🎤 Be fearless,
+  Be vocal, be you. 🌟`,
+
+`🎵 Express the melody
+  Of your heart. 🎧`,
+
+`🎶 Bravery shines
+  In your every note. 💫`,
+
+`🎼 Let each day be
+  A verse of joy. 🎶`,
+
+`🎧 Your voice is powerful,
+  Use it wisely. 🌟`,
+
+`🎤 Resonate with positivity
+  And strength. 🎵`,
+
+`🎼 Follow the rhythm
+  Of your true calling. 🌟`,
+
+`🎧 Life's a song,
+  Play it authentically. 🎶`,
+
+`🎤 Compose a life
+  You’re proud of. 🎼`,
+
+`🎵 Speak with clarity
+  And purpose. 🌟`,
+
+`🎶 Celebrate the harmony
+  In diversity. 🌍`,
+
+`🎼 Your words are music,
+  Make them count. 🎶`,
+
+`🎤 Sing the song
+  Of your dreams. 💫`,
+
+`🎧 Let your voice create
+  Ripples of change. 🌟`,
+
+`🎵 Harmonize with
+  Your surroundings. 🌸`,
+
+`🎼 Every whisper carries
+  A world of meaning. 🌼`,
+
+`🎤 Amplify the good
+  Within you. 🎧`,
+
+`🎵 Joy resonates
+  In every heartfelt note. 💫`,
+
+`🎶 Be the anthem
+  Of your aspirations. 🎼`,
+
+`🎧 Tune out the noise,
+  Listen to your inner song. 🌟`,
+
+`🎤 Lend your voice
+  To the harmonies of hope. 🎵`,
+
+`🎼 Words become music
+  When spoken with love. 💖`,
+
+`🎶 Let the melody
+  Of gratitude guide you. 🌠`,
+
+`🎧 Sync your life
+  With joy and peace. 🎼`,
+
+`🎤 Voice the beauty
+  And wonder within. 🎶`,
+
+`🎵 Love echoes
+  In every kind word. 🌻`,
+
+`🎼 Sing your story,
+  Share your journey. 🎶`,
+
+`🎧 Play the soundtrack
+  Of your passion. 🎸`,
+
+`🎤 Let the rhythm of life
+  Inspire you. 🎼`,
+
+`🎶 Be a voice
+  Of courage and compassion. 💫`,
+
+`🎼 Turn your dreams
+  Into songs of reality. 🌟`,
+
+`🎧 Your voice carries
+  The power to uplift. 🌼`,
+
+`🎵 Every note you sing
+  Is a step forward. 🎼`,
+
+`🎶 Speak your truth
+  With a harmonious heart. 🎧`,
+
+`🎧 Life’s a melody,
+  Let’s play it together. 🌟`,
+
+`🎤 Sing through the challenges
+  With strength. 🎵`,
+
+`🎼 Let your heartbeats
+  Be your music. 💫`,
+
+`🎶 Create a chorus
+  Of inspiration. 🌠`,
+
+`🎧 Harmonize with
+  The love around you. 🎼`,
+
+`🎤 Serenade the world
+  With your kindness. 🌟`,
+
+`🎵 Sing the praises
+  Of simplicity. 🌸`,
+
+`🎼 Compose your life
+  Like a beautiful symphony. 🎶`,
+
+`🎧 Your words are
+  The lyrics of your soul. 💫`,
+
+`🎤 Voice your vision,
+  Embrace your dreams. 🌟`,
+
+`🎵 Let each day be
+  A dance to your rhythm. 🎶`,
+
+`🎼 Your kindness is
+  The harmony we need. 🎼`,
+
+`🎧 Play the song
+  Of resilience. 🌟`,
+
+`🎤 Let love be
+  The chorus of your life. 🎵`,
+
+`🎼 Fill each moment
+  With notes of gratitude. 🌼`,
+
+`🎶 Embrace your melody,
+  It's uniquely yours. 💫`,
+
+`🎧 Let your song
+  Intertwine with others. 🎼`,
+
+`🎤 Dance to the beat
+  That moves your soul. 🎧`,
+
+`🎵 Let your voice
+  Light up the world. 🌟`,
+
+`🎼 In every silence,
+  A song is born. 🎶`,
+
+  `🎶 Emit your inner light,
+    Color the world
+    With joy. 🌟`,
+
+`🎤 Bloom where you are,
+    Let your voice
+    Blossom. 🌼`,
+
+`🎼 Let your energy
+    Be radiant and
+    Vibrant. 🌠`,
+
+`🎧 Embrace your journey,
+    Paint it with
+    Hope. 🎵`,
+
+`🎵 Create a masterpiece
+    Of love and
+    Kindness. 💖`,
+ `🎶 Your words are
+    Brush strokes on
+    Life's canvas. 🎨`,
+
+`🎤 Shine with confidence,
+    Illuminate your
+    Path. ✨`,
+
+`🎼 Harmonize with others,
+    Together we create
+    Beauty. 🌸`,
+
+`🎧 Express yourself
+    Freely and colorfully. 🎨`,
+
+`🎵 Dream in vibrant hues,
+    Live with joy. 🏵️`,
+
+  ];
+
+  // Function to generate a random vibrant color
+  const generateVibrantColor = () => {
+    const colors = [
+      'rgba(156, 39, 176, 0.9)',   // Purple
+      'rgba(33, 150, 243, 0.9)',   // Blue
+      'rgba(244, 67, 54, 0.9)',    // Red
+      'rgba(0, 230, 118, 0.9)',    // Green
+      
+      'rgba(103, 58, 183, 0.9)',   // Deep Purple
+      'rgba(0, 150, 136, 0.9)' ,    // Teal
+      'rgba(224, 64, 251, 0.9)',   /* Pinkish Purple */
+      'rgba(41, 182, 246, 0.9)',    /* Light Blue */
+      'rgba(244, 143, 177, 0.9)',  /* Pink */
+      'rgba(76, 175, 80, 0.9)',    /* Light Green */
+      
+      'rgba(123, 31, 162, 0.9)',    /* Dark Purple */
+      'rgba(0, 172, 193, 0.9)',     /* Cyan */
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  // Function to get time-based greeting
+  const getTimeBasedGreeting = () => {
+    const currentHour = new Date().getHours();
+    if (currentHour < 5) return 'Good Night!';
+    if (currentHour < 8) return 'Good Morning!';
+    if (currentHour < 12) return 'Good Morning!';
+    if (currentHour < 14) return 'Good Afternoon!';
+    if (currentHour < 17) return 'Good Afternoon!';
+    if (currentHour < 19) return 'Good Evening!';
+    if (currentHour < 22) return 'Good Evening!';
+    return 'Good Night!';
+};
+
+
+  useEffect(() => {
+    // Generate a random color for this Snackbar instance
+    const dynamicColor = generateVibrantColor();
+    
+    // Get current time-based greeting
+    const greeting = getTimeBasedGreeting();
+    
+    // Always show a message on component mount for testing
+    const randomMessage = musicMessages[Math.floor(Math.random() * musicMessages.length)];
+    
+    // Personalize with username if available
+    const fullMessage = username 
+      ? `${greeting}, ${username}! 👋\n${randomMessage}` 
+      : `${greeting}! 👋\n${randomMessage}`;
+    
+    console.log('Attempting to show message:', fullMessage);
+    
+    // Ensure state updates are processed
+    const timer = setTimeout(() => {
+      setSnackbarMessage(fullMessage);
+      setOpenSnackbar(true);
+      
+      // Store the dynamic color for this Snackbar instance
+      localStorage.setItem('currentSnackbarColor', dynamicColor);
+      
+      console.log('Snackbar should now be visible');
+    }, 500);
+
+    // Automatically close the Snackbar after 6 seconds
+    const closeTimer = setTimeout(() => {
+      setOpenSnackbar(false);
+      console.log('Snackbar should now be closed');
+    }, 6500);
+
+    // Cleanup function
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(closeTimer);
+    };
+  }, [username]);
+
+  useEffect(() => {
+    const updateSnackbarStyle = () => {
+      if (window.innerWidth < 600) {
+        setSnackbarStyle({
+          width: '90%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: '5%'
+        });
+      } else {
+        setSnackbarStyle({
+          width: '600px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: '5%'
+        });
+      }
+    };
+
+    // Initial setup
+    updateSnackbarStyle();
+
+    // Add event listener for window resize
+    window.addEventListener('resize', updateSnackbarStyle);
+
+    // Cleanup listener
+    return () => window.removeEventListener('resize', updateSnackbarStyle);
+  }, []);
 
   const loadSongsForCategory = async (category, page = 1) => {
     if (loading[category.id]) return;
@@ -764,6 +1469,39 @@ const Home = ({ onSongSelect, username }) => {
           hasMore={hasMore[category.id]}
         />
       ))}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={6000}
+        onClose={() => {
+          console.log('Snackbar closed');
+          setOpenSnackbar(false);
+        }}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{
+          zIndex: 9999, // Ensure it's on top of everything
+          width: snackbarStyle.width,
+          left: snackbarStyle.left,
+          transform: snackbarStyle.transform,
+          top: snackbarStyle.top,
+          '& .MuiSnackbarContent-root': {
+            minWidth: '300px',
+            width: '100%',
+            fontSize: '1.1rem',
+            justifyContent: 'center',
+            padding: '16px',
+            borderRadius: '12px',
+            backgroundColor: localStorage.getItem('currentSnackbarColor') || 'rgba(156, 39, 176, 0.9)', // Use dynamic color
+            color: 'white',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
+            textAlign: 'center',
+            fontStyle: 'italic',
+            whiteSpace: 'pre-line', // Preserve line breaks
+            lineHeight: '1.5',
+            wordWrap: 'break-word',
+          }
+        }}
+      />
     </Box>
   );
 };
