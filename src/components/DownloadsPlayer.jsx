@@ -126,15 +126,15 @@ const DownloadsPlayer = () => {
     <Box
       sx={{
         position: 'fixed',
-        bottom: { xs: 70, sm: 0 },
+        bottom: { xs: 58, sm: 0 },
         left: { xs: 0, sm: 240 },
         right: 0,
         bgcolor: '#282828',
-        padding: 2,
+        padding: 0.3,
         display: 'flex',
         flexDirection: { xs: 'column', sm: 'row' },
         alignItems: 'center',
-        gap: 2,
+        gap: 0,
         zIndex: 1000,
         borderTop: '1px solid rgba(255, 255, 255, 0.1)',
       }}
@@ -143,7 +143,7 @@ const DownloadsPlayer = () => {
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 2,
+          gap: 0.25,
           width: { xs: '100%', sm: '30%' },
           minWidth: { sm: '180px' },
         }}
@@ -164,12 +164,12 @@ const DownloadsPlayer = () => {
           <Box
             component="img"
             src={giphy}
-            alt="Music Visualizer"
+            alt="."
             sx={{
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              opacity: isPlaying ? 1 : 0.5,
+              opacity: isPlaying ? 0.8 : 0.5,
               transition: 'opacity 0.3s ease',
             }}
           />

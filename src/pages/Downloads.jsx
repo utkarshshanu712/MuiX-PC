@@ -183,13 +183,13 @@ const Downloads = () => {
         display: 'flex',
         flexDirection: { xs: 'column', sm: 'row' },
         gap: 3,
-        mb: 4,
-        bgcolor: 'rgba(29, 185, 84, 0.1)',
+        mb: 1,
+        bgcolor: 'rgb(249 249 249 / 7%)',
         borderRadius: 2,
         p: { xs: 2, sm: 3 },
-        width: '100%',
+        width: { xs: '350px', sm: '1000px' },
       }}>
-        <Box sx={{ 
+        {/* <Box sx={{ 
           width: { xs: '100%', sm: 150 },
           height: { xs: 150, sm: 150 },
           bgcolor: '#282828',
@@ -199,13 +199,13 @@ const Downloads = () => {
           borderRadius: 2
         }}>
           <Download sx={{ fontSize: { xs: 80, sm: 100 }, color: '#1db954' }} />
-        </Box>
+        </Box> */}
 
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-          <Typography variant="overline" color="text.secondary">Playlist</Typography>
+          {/* <Typography variant="overline" color="text.secondary">Playlist</Typography> */}
           <Typography variant="h1" sx={{ 
-            mb: 2, 
-            fontSize: { xs: '1.5rem', sm: '2rem' }, 
+            mb: 1, 
+            fontSize: { xs: '1rem', sm: '2rem' }, 
             fontWeight: 'bold' 
           }}>
             Downloads
@@ -218,11 +218,11 @@ const Downloads = () => {
 
       {/* Play Buttons */}
       {downloads.length > 0 && (
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
           <IconButton
             onClick={() => handlePlayAll(false)}
             sx={{
-              p: { xs: 1.5, sm: 2 },
+              p: { xs: 1, sm: 2 },
               bgcolor: '#1db954',
               '&:hover': { bgcolor: '#1ed760', transform: 'scale(1.04)' },
               transition: 'all 0.2s ease'
@@ -262,7 +262,7 @@ const Downloads = () => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 2,
-                    p: 1,
+                    p: 0.5,
                     borderRadius: 1,
                     bgcolor: currentTrack?.id === song.id ? 'rgba(29, 185, 84, 0.1)' : 'transparent',
                     '&:hover': {
@@ -275,7 +275,7 @@ const Downloads = () => {
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    color: currentTrack?.id === song.id ? '#1db954' : 'white'
+                    color: currentTrack?.id === song.id ? '#1db954' : '#adc4d1'
                   }}>
                     {currentTrack?.id === song.id ? (
                       isPlaying ? <Pause /> : <PlayArrow />
@@ -286,7 +286,7 @@ const Downloads = () => {
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography
                       sx={{
-                        color: 'white',
+                        color: '#12cff0',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -296,7 +296,7 @@ const Downloads = () => {
                     </Typography>
                     <Typography
                       variant="body2"
-                      color="text.secondary"
+                      color="#866e58"
                       sx={{
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
