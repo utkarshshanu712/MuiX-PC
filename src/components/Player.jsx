@@ -1084,99 +1084,121 @@ const Player = ({
     handlePlaylistMenuClose();
   }, [selectedTrack, enqueueSnackbar]);
 
-  const handleDownload = useCallback(async (track) => {
-    if (!track || isDownloading) return;
+  const handleDownload = useCallback(async () => {
+    if (!currentTrack || isDownloading) return;
     
     try {
       setIsDownloading(true);
       enqueueSnackbar('Starting download...', { variant: 'info' });
-      
-      // Get download URL with comprehensive fallbacks
-      let downloadUrl;
-      
-      if (track.downloadUrl && Array.isArray(track.downloadUrl)) {
-        const urls = track.downloadUrl
-          .filter(url => url && (url.link || url.url))
-          .map(url => url.link || url.url);
-        downloadUrl = urls[0];
-      }
-      else if (track.downloadUrl && typeof track.downloadUrl === 'string') {
-        downloadUrl = track.downloadUrl;
-      }
-      else if (track.media && track.media.url) {
-        downloadUrl = track.media.url;
-      }
-      else if (track.url) {
-        downloadUrl = track.url;
-      }
+      console.log('Download started for:', currentTrack.name);
 
-      if (!downloadUrl) {
+      // First get the download URL from the track
+      if (!currentTrack.downloadUrl || !currentTrack.downloadUrl.length) {
         throw new Error('No download URL available');
       }
+      console.log('Download URLs available:', currentTrack.downloadUrl);
 
-      // Download the audio file
-      const response = await fetch(downloadUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to download track: ${response.statusText}`);
-      }
-
-      // Get the audio blob
-      const audioBlob = await response.blob();
-      
-      // Save to IndexedDB
-      const songData = {
-        id: track.id,
-        title: track.title || track.name,
-        artist: track.artist || track.primaryArtists,
-        duration: track.duration,
-        downloadDate: new Date().toISOString(),
-        coverUrl: track.image?.[0]?.link || track.coverUrl
+      // Map quality settings
+      const qualityMap = {
+        '96kbps': '96',
+        '160kbps': '160',
+        '320kbps': '320'
       };
 
-      // Try to save to IndexedDB
-      try {
-        await audioStorage.saveSong(songData, audioBlob);
-      } catch (dbError) {
-        console.error('Failed to save to IndexedDB:', dbError);
-        // Continue with download even if IndexedDB fails
+      const targetQuality = qualityMap[downloadQuality] || '320';
+      console.log('Requested download quality:', targetQuality);
+
+      // Sort URLs by quality
+      const sortedUrls = [...currentTrack.downloadUrl].sort((a, b) => {
+        const qualityA = parseInt(a.quality);
+        const qualityB = parseInt(b.quality);
+        return Math.abs(qualityA - parseInt(targetQuality)) - Math.abs(qualityB - parseInt(targetQuality));
+      });
+
+      console.log('Sorted download URLs:', sortedUrls);
+
+      // Get the best matching quality URL
+      const selectedUrl = sortedUrls[0];
+      if (!selectedUrl || !selectedUrl.url) {
+        throw new Error('No suitable quality URL found');
       }
 
-      // Create download link for user
-      const url = window.URL.createObjectURL(audioBlob);
+      console.log('Selected quality URL:', selectedUrl.url);
+
+      // Download the file
+      const response = await fetch(selectedUrl.url, {
+        headers: {
+          'Accept': 'audio/mpeg'
+        }
+      });
+      console.log('Download response status:', response.status);
+
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+
+      const blob = await response.blob();
+      console.log('Blob size:', blob.size);
+
+      // Verify file size
+      const durationInSeconds = currentTrack.duration || 180;
+      const expectedSize = (parseInt(selectedUrl.quality) * 1024 * durationInSeconds) / 8;
+      console.log('Expected size:', expectedSize);
+
+      // Save to IndexedDB
+      await audioStorage.saveSong({
+        ...currentTrack,
+        quality: selectedUrl.quality,
+        size: blob.size,
+        downloadDate: new Date().toISOString()
+      }, blob);
+      console.log('Song saved successfully:', currentTrack.id);
+
+      // Update downloads in localStorage
+      const downloads = JSON.parse(localStorage.getItem('downloads') || '[]');
+      const downloadEntry = {
+        id: currentTrack.id,
+        name: currentTrack.name,
+        artist: currentTrack.primaryArtists,
+        duration: currentTrack.duration,
+        quality: selectedUrl.quality,
+        size: blob.size,
+        downloadDate: new Date().toISOString(),
+        thumbnail: currentTrack.image?.[2]?.url || currentTrack.image?.[1]?.url || currentTrack.image?.[0]?.url
+      };
+
+      // Add to downloads if not already present
+      if (!downloads.some(d => d.id === currentTrack.id)) {
+        downloads.push(downloadEntry);
+        localStorage.setItem('downloads', JSON.stringify(downloads));
+        console.log('Download entry added to localStorage:', downloadEntry);
+      }
+
+      // Dispatch event to notify Downloads page
+      window.dispatchEvent(new Event('downloadComplete'));
+      console.log('Download complete event dispatched.');
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${track.title || track.name || 'Unknown Track'}.mp3`;
+      a.download = `${currentTrack.name} (${selectedUrl.quality}kbps).mp3`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      console.log('Download link clicked for:', currentTrack.name);
 
-      // Save metadata to localStorage for quick access
-      try {
-        const existingDownloads = JSON.parse(localStorage.getItem('downloads') || '[]');
-        if (!existingDownloads.some(song => song.id === track.id)) {
-          existingDownloads.push(songData);
-          localStorage.setItem('downloads', JSON.stringify(existingDownloads));
-        }
-      } catch (storageError) {
-        console.error('Failed to save to localStorage:', storageError);
-      }
-
-      // Notify success
-      enqueueSnackbar('Download complete!', { variant: 'success' });
-      
-      // Trigger download complete event
-      window.dispatchEvent(new CustomEvent('downloadComplete', {
-        detail: { songId: track.id }
-      }));
-
+      enqueueSnackbar('Download completed successfully', { variant: 'success' });
     } catch (error) {
-      console.error('Download failed:', error);
-      enqueueSnackbar(`Download failed: ${error.message}`, { variant: 'error' });
+      console.error('Download error:', error);
+      setError('Failed to download song');
+      enqueueSnackbar('Failed to download song', { variant: 'error' });
     } finally {
       setIsDownloading(false);
+      console.log('Setting isDownloading to false.');
     }
-  }, [enqueueSnackbar, isDownloading]);
+  }, [currentTrack, downloadQuality, enqueueSnackbar, isDownloading]);
 
   return (
     <>
@@ -1472,9 +1494,7 @@ const Player = ({
         sleepTimer={timerDuration}
         onSleepTimerSet={handleTimerSet}
         onQueueItemClick={onQueueItemClick}
-        onDownload={() => currentTrack && handleDownload(currentTrack).catch(error => {
-          console.error('Download failed:', error);
-        })}
+        onDownload={handleDownload}
         onTimeChange={handleSliderChange}
         volume={volume}
         onVolumeChange={handleVolumeChange}

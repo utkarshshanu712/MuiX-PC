@@ -16,11 +16,9 @@ export const SettingsProvider = ({ children }) => {
   const [downloadQuality, setDownloadQuality] = useLocalStorage('downloadQuality', '320kbps');
 
   const qualityOptions = [
-    { label: 'Low (12 kbps)', value: '12kbps' },
-    { label: 'Normal (48 kbps)', value: '48kbps' },
-    { label: 'Medium (96 kbps)', value: '96kbps' },
-    { label: 'High (160 kbps)', value: '160kbps' },
-    { label: 'Very High (320 kbps)', value: '320kbps' },
+    { label: 'Normal (96 kbps)', value: '96kbps' },
+    { label: 'Medium (160 kbps)', value: '160kbps' },
+    { label: 'High (320 kbps)', value: '320kbps' },
   ];
 
   const getUrlForQuality = (downloadUrls, targetQuality) => {
@@ -28,17 +26,44 @@ export const SettingsProvider = ({ children }) => {
       return downloadUrls;
     }
     
-    // Extract just the number from the quality string
-    const targetKbps = parseInt(targetQuality);
+    // Debug log the input
+    console.log('Target Quality:', targetQuality);
+    console.log('Available Download URLs:', downloadUrls);
     
-    // Find the closest quality URL
-    const sortedUrls = [...downloadUrls].sort((a, b) => {
-      const qualityA = parseInt(a.quality);
-      const qualityB = parseInt(b.quality);
-      return Math.abs(qualityA - targetKbps) - Math.abs(qualityB - targetKbps);
+    // Map quality strings to Saavn's quality codes
+    const qualityMap = {
+      '96kbps': '96',
+      '160kbps': '160',
+      '320kbps': '320'
+    };
+    
+    // Get target quality code
+    const targetQualityCode = qualityMap[targetQuality] || '320';
+    console.log('Target Quality Code:', targetQualityCode);
+    
+    // Find exact quality match first
+    let selectedUrl = downloadUrls.find(url => {
+      const urlQuality = url.quality || '';
+      return urlQuality.toString() === targetQualityCode;
     });
     
-    return sortedUrls[0]?.url || downloadUrls[0]?.url;
+    // If no exact match, find closest higher quality
+    if (!selectedUrl) {
+      const validUrls = downloadUrls
+        .filter(url => url.quality && !isNaN(parseInt(url.quality)))
+        .sort((a, b) => parseInt(a.quality) - parseInt(b.quality));
+      
+      selectedUrl = validUrls.find(url => parseInt(url.quality) >= parseInt(targetQualityCode)) || validUrls[0];
+    }
+    
+    if (selectedUrl) {
+      console.log('Selected Quality:', selectedUrl.quality);
+      console.log('Selected URL:', selectedUrl.url);
+      return selectedUrl.url;
+    }
+    
+    console.warn('No valid quality URLs found, using first available URL');
+    return downloadUrls[0]?.url;
   };
 
   const value = {

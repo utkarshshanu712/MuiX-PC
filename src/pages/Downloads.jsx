@@ -58,49 +58,28 @@ const Downloads = () => {
 
   const loadDownloadedSongs = async () => {
     try {
-      // Get metadata from localStorage
       const storedDownloads = JSON.parse(localStorage.getItem('downloads') || '[]');
-      
-      // Verify and clean up storage
+      console.log('Stored downloads:', storedDownloads); // Check this log
+      console.log('Stored downloads structure:', JSON.stringify(storedDownloads, null, 2)); // New log
+
       const verifiedDownloads = [];
-      const cleanupPromises = [];
-      
       for (const song of storedDownloads) {
-        try {
-          const storedSong = await audioStorage.getSong(song.id);
-          if (storedSong && storedSong.audioBlob) {
-            verifiedDownloads.push({
-              ...song,
-              isOffline: true,
-              audioBlob: storedSong.audioBlob
-            });
-          } else {
-            // If song not in IndexedDB, mark for cleanup from localStorage
-            cleanupPromises.push(song.id);
-          }
-        } catch (error) {
+        const storedSong = await audioStorage.getSong(song.id);
+        if (storedSong && storedSong.audioBlob) {
+          verifiedDownloads.push({
+            ...song,
+            isOffline: true,
+            audioBlob: storedSong.audioBlob
+          });
+        } else {
           console.warn(`Song ${song.id} not found in IndexedDB, removing from localStorage`);
-          cleanupPromises.push(song.id);
         }
       }
-      
-      // Clean up localStorage if needed
-      if (cleanupPromises.length > 0) {
-        const cleanedDownloads = storedDownloads.filter(
-          song => !cleanupPromises.includes(song.id)
-        );
-        localStorage.setItem('downloads', JSON.stringify(cleanedDownloads));
-        
-        if (cleanedDownloads.length !== storedDownloads.length) {
-          enqueueSnackbar('Some downloaded songs were not found and have been cleaned up', 
-            { variant: 'warning' });
-        }
-      }
-      
+      console.log('Verified downloads:', verifiedDownloads); // Check this log
+      console.log('Verified downloads structure:', JSON.stringify(verifiedDownloads, null, 2)); // New log
       setDownloads(verifiedDownloads);
     } catch (error) {
-      console.error('Failed to load downloads:', error);
-      enqueueSnackbar('Failed to load downloads', { variant: 'error' });
+      console.error('Error loading downloads:', error);
     }
   };
 
@@ -356,7 +335,7 @@ const Downloads = () => {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {song.title}
+                      {song.title || song.name}
                     </Typography>
                     <Typography
                       variant="body2"
@@ -395,55 +374,25 @@ const Downloads = () => {
                     <TableCell sx={{ width: { sm: '10%', md: '10%' } }}></TableCell>
                   </TableRow>
                 </TableHead>
-                <TableBody>
-                  {downloads.map((song, index) => (
-                    <TableRow
-                      key={song.id}
-                      sx={{
-                        cursor: 'pointer',
-                        bgcolor: currentTrack?.id === song.id ? 'rgba(29, 185, 84, 0.1)' : 'transparent',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 255, 255, 0.1)',
-                        },
-                      }}
-                      onClick={() => handlePlaySong(song)}
-                    >
-                      <TableCell sx={{ color: 'white' }}>
-                        {currentTrack?.id === song.id ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', color: '#1db954' }}>
-                            {isPlaying ? <Pause fontSize="small" /> : <PlayArrow fontSize="small" />}
-                          </Box>
-                        ) : (
-                          index + 1
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography sx={{ color: 'white' }}>
-                            {song.title}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {song.artist}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.secondary' }}>
-                        {formatDate(song.downloadDate)}
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.secondary' }}>
-                        {formatDuration(song.duration)}
-                      </TableCell>
-                      <TableCell>
-                        <IconButton
-                          onClick={(e) => handleMenuOpen(e, song)}
-                          sx={{ color: 'text.secondary' }}
-                        >
-                          <MoreVert />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
+               <TableBody>
+                   {downloads.map((song) => (
+                       <TableRow 
+                           key={song.id} 
+                           onClick={() => handlePlaySong(song)} // Add this line
+                           sx={{
+                               cursor: 'pointer',
+                               '&:hover': {
+                                   bgcolor: 'rgba(255, 255, 255, 0.1)',
+                               },
+                           }}
+                       >
+                           <TableCell>{song.name || song.title}</TableCell>
+                           <TableCell>{song.artist}</TableCell>
+                           <TableCell>{formatDate(song.downloadDate)}</TableCell>
+                           <TableCell>{formatDuration(song.duration)}</TableCell>
+                       </TableRow>
+                   ))}
+               </TableBody>
               </Table>
             </TableContainer>
           )}
