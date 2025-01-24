@@ -19,7 +19,8 @@ import {
   Button,
   InputBase,
   Paper,
-  Snackbar
+  Snackbar,
+  Chip
 } from "@mui/material";
 import { 
   ChevronLeft, 
@@ -27,7 +28,8 @@ import {
   Close as CloseIcon, 
   PlayArrow as PlayArrowIcon,
   Shuffle as ShuffleIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Verified as VerifiedIcon
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -35,6 +37,7 @@ import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTopPlaylists } from '../contexts/TopPlaylistsContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
+import { useArtists } from "../contexts/ArtistContext";
 
 const categories = [
   { id: "trending", title: "Trending Now", query: "latest songs" },
@@ -872,6 +875,204 @@ const AlbumSection = ({ title, albums, onAlbumSelect, onLoadMore, hasMore }) => 
               zIndex: 2,
               '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
               display: { xs: 'none', sm: 'flex' }
+            }}
+          >
+            <ChevronRight />
+          </IconButton>
+        )}
+      </Box>
+    </Box>
+  );
+};
+
+const TopArtistsSection = () => {
+  const containerRef = useRef(null);
+  const [showLeftScroll, setShowLeftScroll] = useState(false);
+  const [showRightScroll, setShowRightScroll] = useState(true);
+  const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { topArtists } = useArtists();
+
+  const handleScroll = (direction) => {
+    if (containerRef.current) {
+      const container = containerRef.current;
+      const scrollAmount = direction === 'left' ? -container.offsetWidth : container.offsetWidth;
+      container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  const checkScrollButtons = () => {
+    if (containerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+      setShowLeftScroll(scrollLeft > 0);
+      setShowRightScroll(scrollLeft + clientWidth < scrollWidth);
+    }
+  };
+
+  const handleViewAll = () => {
+    navigate('/top-artists');
+  };
+
+  const handleArtistClick = (artistId) => {
+    navigate(`/artist/${artistId}`);
+  };
+
+  useEffect(() => {
+    checkScrollButtons();
+    window.addEventListener('resize', checkScrollButtons);
+    return () => window.removeEventListener('resize', checkScrollButtons);
+  }, []);
+
+  return (
+    <Box sx={{ mb: 4, position: 'relative' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 2,
+        px: { xs: 1, sm: 2 }
+      }}>
+        <Typography variant="h5" sx={{ color: 'white', fontWeight: 700 }}>
+          Top Artists
+        </Typography>
+        <Button
+          onClick={handleViewAll}
+          sx={{
+            color: 'rgba(255,255,255,0.7)',
+            '&:hover': {
+              color: 'white',
+              bgcolor: 'rgba(255,255,255,0.1)'
+            }
+          }}
+        >
+          See All
+        </Button>
+      </Box>
+
+      <Box sx={{ position: 'relative' }}>
+        {showLeftScroll && !isMobile && (
+          <IconButton
+            onClick={() => handleScroll('left')}
+            sx={{
+              position: 'absolute',
+              left: -20,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              bgcolor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              zIndex: 2,
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' }
+            }}
+          >
+            <ChevronLeft />
+          </IconButton>
+        )}
+
+        <Box
+          ref={containerRef}
+          onScroll={checkScrollButtons}
+          sx={{
+            display: 'flex',
+            gap: 2,
+            overflowX: 'auto',
+            scrollBehavior: 'smooth',
+            '&::-webkit-scrollbar': { display: 'none' },
+            scrollbarWidth: 'none',
+            px: { xs: 1, sm: 2 }
+          }}
+        >
+          {topArtists.map((artist) => (
+            <Box
+              key={artist.id}
+              onClick={() => handleArtistClick(artist.id)}
+              sx={{
+                flex: '0 0 auto',
+                width: { xs: '140px', sm: '180px' },
+                textAlign: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'scale(1.05)',
+                  '& .overlay': {
+                    opacity: 1
+                  }
+                }
+              }}
+            >
+              <Box sx={{ position: 'relative', mb: 1 }}>
+                <Avatar
+                  src={artist.image}
+                  alt={artist.name}
+                  sx={{
+                    width: '100%',
+                    height: 'auto',
+                    aspectRatio: '1/1',
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                    border: '2px solid rgba(255,255,255,0.1)',
+                    '&:hover': {
+                      border: '2px solid #1DB954'
+                    }
+                  }}
+                />
+                <Box
+                  className="overlay"
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(0,0,0,0.4)',
+                    opacity: 0,
+                    transition: 'opacity 0.3s ease'
+                  }}
+                >
+                  <IconButton
+                    sx={{
+                      bgcolor: '#1DB954',
+                      '&:hover': { bgcolor: '#1ed760' }
+                    }}
+                  >
+                    <PlayArrowIcon />
+                  </IconButton>
+                </Box>
+              </Box>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  color: 'white',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.5
+                }}
+              >
+                {artist.name}
+                {artist.isVerified && (
+                  <VerifiedIcon sx={{ color: '#1DB954', fontSize: 16 }} />
+                )}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        {showRightScroll && !isMobile && (
+          <IconButton
+            onClick={() => handleScroll('right')}
+            sx={{
+              position: 'absolute',
+              right: -20,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              bgcolor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              zIndex: 2,
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' }
             }}
           >
             <ChevronRight />
@@ -1797,6 +1998,11 @@ const Home = ({ onSongSelect, username }) => {
             </Box>
           ))}
         </Box>
+      </Box>
+
+      {/* Top Artists section */}
+      <Box sx={{ mt: { xs: 3, sm: 4, md: 5 } }}>
+        <TopArtistsSection />
       </Box>
 
       {/* Recently Played section */}
