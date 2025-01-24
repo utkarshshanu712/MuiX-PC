@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
   Typography,
@@ -37,11 +37,22 @@ import { useTopPlaylists } from '../contexts/TopPlaylistsContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 
 const categories = [
-  { id: "trending", title: "Trending Now", query: "latest songs," },
+  { id: "trending", title: "Trending Now", query: "latest songs" },
   { id: "punjabi", title: "Punjabi Hits", query: "punjabi hits" },
   { id: "bollywood", title: "Bollywood Hits", query: "Top Bollywood Hits" },
-  { id: "romantic", title: "Romantic Hits", query: "hindi Romantic songs" },
   { id: "old songs", title: "Old Songs", query: "old hindi songs" },
+];
+
+const albumCategories = [
+  { id: "new-releases", title: "New Releases", query: "new albums 2024" },
+  { 
+    id: "new-movies", 
+    title: "Movie Albums", 
+    type: "album",
+    query: "new bollywood movie albums "
+  },
+  { id: "top-albums", title: "Top Albums", query: "best albums" },
+  // { id: "featured-albums", title: "Featured Albums", query: "featured albums" },
 ];
 
 const topCharts = [
@@ -413,105 +424,460 @@ const ChartCard = ({ title, chart, onSongSelect }) => {
 };
 
 const SwipeableSection = ({ title, songs, onSongSelect, onLoadMore, hasMore }) => {
-  const theme = useTheme();
-  const [currentPage, setCurrentPage] = useState(0);
-  const itemsPerPage = 20;
+  const containerRef = useRef(null);
+  const [showLeftScroll, setShowLeftScroll] = useState(false);
+  const [showRightScroll, setShowRightScroll] = useState(true);
 
-  const handleNext = useCallback(() => {
-    setCurrentPage(prev => prev + 1);
-  }, []);
+  const handlePlayAll = (shuffle = false) => {
+    if (!songs || songs.length === 0) return;
+    
+    let songsToPlay = [...songs];
+    if (shuffle) {
+      // Fisher-Yates shuffle
+      for (let i = songsToPlay.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [songsToPlay[i], songsToPlay[j]] = [songsToPlay[j], songsToPlay[i]];
+      }
+    }
+    
+    const [firstSong, ...remainingSongs] = songsToPlay;
+    onSongSelect(firstSong, remainingSongs);
+  };
 
-  const handlePrev = useCallback(() => {
-    setCurrentPage(prev => Math.max(0, prev - 1));
-  }, []);
+  const checkScrollButtons = () => {
+    if (containerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+      setShowLeftScroll(scrollLeft > 0);
+      setShowRightScroll(scrollLeft + clientWidth < scrollWidth);
+    }
+  };
 
-  const startIndex = currentPage * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const visibleSongs = songs.slice(startIndex, endIndex);
+  useEffect(() => {
+    checkScrollButtons();
+    window.addEventListener('resize', checkScrollButtons);
+    return () => window.removeEventListener('resize', checkScrollButtons);
+  }, [songs]);
+
+  const scroll = (direction) => {
+    if (containerRef.current) {
+      const scrollAmount = direction === 'left' ? -400 : 400;
+      containerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   return (
-    <Box sx={{ mb: { xs: 3, sm: 4 }, px: 1 }}>
+    <Box sx={{ mb: 4, position: 'relative', px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        mb: 2
+      }}>
+        <Typography
+          variant="h6"
+          sx={{
+            color: 'white',
+            fontSize: { xs: '1.2rem', sm: '1.4rem' },
+            fontWeight: 700,
+            pl: 0.5
+          }}
+        >
+          {title}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => handlePlayAll(false)}
+            sx={{
+              bgcolor: 'rgba(255,255,255,0.1)',
+              color: 'white',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+              textTransform: 'none',
+              borderRadius: 3,
+              px: 2,
+              height: 32,
+              minWidth: 80
+            }}
+          >
+            Play all
+          </Button>
+          <IconButton 
+            onClick={() => handlePlayAll(true)}
+            sx={{ 
+              color: 'white',
+              bgcolor: 'rgba(255,255,255,0.1)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+              width: 32,
+              height: 32
+            }}
+          >
+            <ShuffleIcon />
+          </IconButton>
+          <IconButton 
+            onClick={() => scroll('left')}
+            disabled={!showLeftScroll}
+            sx={{ 
+              color: 'white', 
+              '&.Mui-disabled': { color: 'rgba(255,255,255,0.3)' },
+              display: { xs: 'none', sm: 'flex' }
+            }}
+          >
+            <ChevronLeft />
+          </IconButton>
+          <IconButton 
+            onClick={() => scroll('right')}
+            disabled={!showRightScroll}
+            sx={{ 
+              color: 'white', 
+              '&.Mui-disabled': { color: 'rgba(255,255,255,0.3)' },
+              display: { xs: 'none', sm: 'flex' }
+            }}
+          >
+            <ChevronRight />
+          </IconButton>
+        </Box>
+      </Box>
+
+      <Box
+        ref={containerRef}
+        onScroll={checkScrollButtons}
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'repeat(4, minmax(200px, 1fr))',
+            sm: 'repeat(2, 1fr)',
+            md: 'repeat(3, 1fr)',
+            lg: 'repeat(4, 1fr)'
+          },
+          gap: 2,
+          overflowX: 'auto',
+          scrollSnapType: 'x mandatory',
+          '&::-webkit-scrollbar': { display: 'none' },
+          scrollbarWidth: 'none',
+          pb: 1,
+          WebkitOverflowScrolling: 'touch',
+          gridAutoFlow: 'dense'
+        }}
+      >
+        {songs.map((song) => (
+          <Box
+            key={song.id}
+            onClick={() => onSongSelect(song)}
+            sx={{
+              display: 'flex',
+              gap: 2,
+              p: 1.5,
+              bgcolor: 'rgba(255,255,255,0.05)',
+              borderRadius: 1,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              '&:hover': {
+                bgcolor: 'rgba(255,255,255,0.1)',
+              },
+              scrollSnapAlign: 'start',
+              minWidth: { xs: '200px', sm: '300px' }
+            }}
+          >
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 1,
+                overflow: 'hidden',
+                flexShrink: 0,
+                bgcolor: 'rgba(0,0,0,0.2)',
+                position: 'relative'
+              }}
+            >
+              <img
+                src={
+                  Array.isArray(song.image) && song.image.length > 0
+                    ? song.image[song.image.length - 1].url // Get highest quality image (last in array)
+                    : song.image?.url || song.downloadUrl?.[song.downloadUrl.length - 1]?.url || 'https://via.placeholder.com/48?text=Music'
+                }
+                alt={song.name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block'
+                }}
+                onError={(e) => {
+                  console.log('Image load error for:', song.name);
+                  e.target.src = 'https://via.placeholder.com/48?text=Music';
+                }}
+                loading="lazy"
+              />
+            </Box>
+            <Box sx={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
+              <Typography
+                sx={{
+                  color: 'white',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.2
+                }}
+              >
+                {song.name}
+              </Typography>
+              <Typography
+                sx={{
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: '0.8rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  mt: 0.5
+                }}
+              >
+                {song.primaryArtists}
+              </Typography>
+            </Box>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+};
+
+const AlbumCard = ({ album, onAlbumSelect }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const imageUrl = album.image?.[2]?.link || 
+                  album.image?.[1]?.link || 
+                  album.image?.[0]?.link ||
+                  album.image?.[2]?.url ||
+                  album.image?.[1]?.url ||
+                  album.image?.[0]?.url;
+
+  return (
+    <Box
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => {
+        setIsLoading(true);
+        onAlbumSelect(album).finally(() => setIsLoading(false));
+      }}
+      sx={{
+        position: 'relative',
+        cursor: 'pointer',
+        transition: 'transform 0.2s',
+        '&:hover': {
+          transform: { xs: 'none', sm: 'scale(1.05)' }
+        }
+      }}
+    >
+      <Box sx={{ position: 'relative', borderRadius: 2, overflow: 'hidden' }}>
+        <Box
+          component="img"
+          src={imageUrl}
+          alt={album.name}
+          onError={(e) => {
+            e.target.src = 'https://via.placeholder.com/300?text=Album+Art';
+          }}
+          sx={{ 
+            width: '100%',
+            aspectRatio: '1/1',
+            objectFit: 'cover',
+            display: 'block',
+            filter: isHovered ? 'brightness(0.7)' : 'brightness(1)',
+            transition: 'filter 0.3s'
+          }}
+        />
+        {isHovered && (
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 8,
+              right: 8,
+              width: 35,
+              height: 35,
+              borderRadius: '50%',
+              bgcolor: '#1DB954',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              opacity: isHovered ? 1 : 0,
+              transform: isHovered ? 'scale(1)' : 'scale(0.8)',
+              transition: 'all 0.2s',
+            }}
+          >
+            <PlayArrowIcon sx={{ color: '#000', fontSize: 20 }} />
+          </Box>
+        )}
+        {isLoading && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(0,0,0,0.5)',
+            }}
+          >
+            <CircularProgress size={30} sx={{ color: 'white' }} />
+          </Box>
+        )}
+      </Box>
+      <Box sx={{ mt: 1, px: 0.5 }}>
+        <Typography 
+          variant="body1"
+          sx={{
+            color: 'white',
+            fontWeight: 500,
+            fontSize: '0.95rem',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            lineHeight: 1.2,
+            minHeight: '2.4em'
+          }}
+        >
+          {album.name}
+        </Typography>
+        <Typography 
+          variant="body2"
+          sx={{
+            color: 'rgba(255,255,255,0.7)',
+            fontSize: '0.85rem',
+            mt: 0.5,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {album.primaryArtists || 'Various Artists'}
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
+
+const AlbumSection = ({ title, albums, onAlbumSelect, onLoadMore, hasMore }) => {
+  const theme = useTheme();
+  const containerRef = useRef(null);
+  const [showLeftScroll, setShowLeftScroll] = useState(false);
+  const [showRightScroll, setShowRightScroll] = useState(true);
+
+  const checkScrollButtons = () => {
+    if (containerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+      setShowLeftScroll(scrollLeft > 0);
+      setShowRightScroll(scrollLeft + clientWidth < scrollWidth);
+    }
+  };
+
+  useEffect(() => {
+    checkScrollButtons();
+    window.addEventListener('resize', checkScrollButtons);
+    return () => window.removeEventListener('resize', checkScrollButtons);
+  }, [albums]);
+
+  const scroll = (direction) => {
+    if (containerRef.current) {
+      const scrollAmount = direction === 'left' ? -400 : 400;
+      containerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  return (
+    <Box sx={{ mb: 4, position: 'relative', px: { xs: 2, sm: 3 } }}>
       <Typography
         variant="h6"
         sx={{
-          fontSize: { xs: '2rem', sm: '2.25rem' },
-          fontWeight: 600,
-          mb: { xs: 2, sm: 2.5 },
-          color: '#4DC1CC',
+          color: 'white',
+          fontSize: { xs: '1.2rem', sm: '1.4rem' },
+          fontWeight: 500,
+          mb: 2,
+          pl: 0.5
         }}
       >
         {title}
       </Typography>
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          gap: 2.5,
-          maxWidth: '100%',
-          overflowX: 'hidden',
-          position: 'relative',
-        }}
-      >
-        {visibleSongs.map((song) => (
-          <Box
-            key={song.id}
+      <Box sx={{ position: 'relative' }}>
+        {showLeftScroll && (
+          <IconButton
+            onClick={() => scroll('left')}
             sx={{
-              width: '100%',
+              position: 'absolute',
+              left: -16,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              bgcolor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              zIndex: 2,
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
+              display: { xs: 'none', sm: 'flex' }
             }}
           >
-            <SongCard song={song} onSongSelect={onSongSelect} />
-          </Box>
-        ))}
+            <ChevronLeft />
+          </IconButton>
+        )}
+        
+        <Box
+          ref={containerRef}
+          onScroll={checkScrollButtons}
+          sx={{
+            display: 'grid',
+            gridAutoFlow: 'column',
+            gridAutoColumns: { 
+              xs: '45%',
+              sm: '30%',
+              md: '23%',
+              lg: '18%' 
+            },
+            gap: 2,
+            overflowX: 'auto',
+            scrollSnapType: 'x mandatory',
+            '&::-webkit-scrollbar': { display: 'none' },
+            scrollbarWidth: 'none',
+            pb: 1
+          }}
+        >
+          {albums.map((album) => (
+            <Box
+              key={album.id}
+              sx={{
+                scrollSnapAlign: 'start',
+              }}
+            >
+              <AlbumCard album={album} onAlbumSelect={onAlbumSelect} />
+            </Box>
+          ))}
+        </Box>
 
-        {songs.length > itemsPerPage && (
-          <>
-            <IconButton
-              onClick={handlePrev}
-              disabled={currentPage === 0}
-              sx={{
-                position: 'absolute',
-                left: -20,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                bgcolor: 'background.paper',
-                '&:hover': { bgcolor: 'action.hover' },
-                visibility: currentPage === 0 ? 'hidden' : 'visible',
-              }}
-            >
-              <ChevronLeft />
-            </IconButton>
-            <IconButton
-              onClick={handleNext}
-              disabled={endIndex >= songs.length}
-              sx={{
-                position: 'absolute',
-                right: -20,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                bgcolor: 'background.paper',
-                '&:hover': { bgcolor: 'action.hover' },
-                visibility: endIndex >= songs.length ? 'hidden' : 'visible',
-              }}
-            >
-              <ChevronRight />
-            </IconButton>
-          </>
+        {showRightScroll && (
+          <IconButton
+            onClick={() => scroll('right')}
+            sx={{
+              position: 'absolute',
+              right: -16,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              bgcolor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              zIndex: 2,
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
+              display: { xs: 'none', sm: 'flex' }
+            }}
+          >
+            <ChevronRight />
+          </IconButton>
         )}
       </Box>
-
-      {hasMore && (
-        <Box sx={{ textAlign: 'center', mt: 2 }}>
-          <Button
-            variant="text"
-            color="primary"
-            onClick={onLoadMore}
-            sx={{ color: 'white' }}
-          >
-            Load More
-          </Button>
-        </Box>
-      )}
     </Box>
   );
 };
@@ -520,6 +886,7 @@ const Home = ({ onSongSelect, username }) => {
   const { topPlaylists, isLoading } = useTopPlaylists();
   const { recentlyPlayed } = useUserPreferences();
   const [categoryData, setCategoryData] = useState({});
+  const [albumData, setAlbumData] = useState({});
   const [loading, setLoading] = useState({});
   const [pages, setPages] = useState({});
   const [hasMore, setHasMore] = useState({});
@@ -535,7 +902,119 @@ const Home = ({ onSongSelect, username }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
 
-  // Expanded music messages with 100+ unique quotes
+  const loadSongsForCategory = async (category, page = 1) => {
+    if (loading[category.id]) return;
+
+    setLoading((prev) => ({ ...prev, [category.id]: true }));
+    try {
+      const response = await axios.get(
+        `https://saavn.dev/api/search/songs?query=${encodeURIComponent(
+          category.query
+        )}&page=${page}&limit=20`
+      );
+
+      const newSongs = response.data?.data?.results || [];
+      setCategoryData((prev) => ({
+        ...prev,
+        [category.id]:
+          page === 1 ? newSongs : [...(prev[category.id] || []), ...newSongs],
+      }));
+
+      setPages((prev) => ({ ...prev, [category.id]: page }));
+      setHasMore((prev) => ({
+        ...prev,
+        [category.id]: newSongs.length === 20,
+      }));
+    } catch (error) {
+      console.error(`Error loading songs for ${category.title}:`, error);
+    } finally {
+      setLoading((prev) => ({ ...prev, [category.id]: false }));
+    }
+  };
+
+  const loadAlbumsForCategory = async (category, page = 1) => {
+    if (loading[category.id]) return;
+
+    setLoading((prev) => ({ ...prev, [category.id]: true }));
+    try {
+      let response;
+      if (category.type === 'album') {
+        // For movie albums
+        response = await axios.get(
+          `https://saavn.dev/api/search/albums?query=${encodeURIComponent(
+            category.query
+          )}&page=${page}&limit=20`
+        );
+        const newAlbums = response.data?.data?.results || [];
+        const movieAlbums = newAlbums.map(album => ({
+          ...album,
+          type: 'album'  // Mark as album for different routing
+        }));
+
+        setAlbumData((prev) => ({
+          ...prev,
+          [category.id]: page === 1 ? movieAlbums : [...(prev[category.id] || []), ...movieAlbums],
+        }));
+      } else {
+        // For regular playlists
+        response = await axios.get(
+          `https://saavn.dev/api/search/playlists?query=${encodeURIComponent(
+            category.query
+          )}&page=${page}&limit=20`
+        );
+        const newAlbums = response.data?.data?.results || [];
+        setAlbumData((prev) => ({
+          ...prev,
+          [category.id]: page === 1 ? newAlbums : [...(prev[category.id] || []), ...newAlbums],
+        }));
+      }
+
+      setPages((prev) => ({ ...prev, [category.id]: page }));
+      setHasMore((prev) => ({
+        ...prev,
+        [category.id]: (response.data?.data?.results || []).length === 20,
+      }));
+    } catch (error) {
+      console.error(`Error loading albums for ${category.title}:`, error);
+    } finally {
+      setLoading((prev) => ({ ...prev, [category.id]: false }));
+    }
+  };
+
+  const handleAlbumClick = (album) => {
+    if (album.id) {
+      if (album.type === 'album') {
+        navigate(`/album/${album.id}`);  // Navigate to album page for movies
+      } else {
+        navigate(`/playlist/top/${album.id}`);  // Navigate to playlist page for others
+      }
+    }
+  };
+
+  // Load initial data
+  useEffect(() => {
+    categories.forEach((category) => {
+      loadSongsForCategory(category);
+    });
+    
+    albumCategories.forEach((category) => {
+      loadAlbumsForCategory(category);
+    });
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Refresh albums every hour
+  useEffect(() => {
+    const refreshAlbums = () => {
+      albumCategories.forEach((category) => {
+        loadAlbumsForCategory(category);
+      });
+    };
+
+    const intervalId = setInterval(refreshAlbums, 3600000); // 1 hour in milliseconds
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const musicMessages = [
     // Previous quotes remain the same, now adding 100 more
 
@@ -1160,7 +1639,6 @@ const Home = ({ onSongSelect, username }) => {
     return 'Good Night!';
 };
 
-
   useEffect(() => {
     // Generate a random color for this Snackbar instance
     const dynamicColor = generateVibrantColor();
@@ -1231,43 +1709,6 @@ const Home = ({ onSongSelect, username }) => {
     return () => window.removeEventListener('resize', updateSnackbarStyle);
   }, []);
 
-  const loadSongsForCategory = async (category, page = 1) => {
-    if (loading[category.id]) return;
-
-    setLoading((prev) => ({ ...prev, [category.id]: true }));
-    try {
-      const response = await axios.get(
-        `https://saavn.dev/api/search/songs?query=${encodeURIComponent(
-          category.query
-        )}&page=${page}&limit=20`
-      );
-
-      const newSongs = response.data?.data?.results || [];
-
-      setCategoryData((prev) => ({
-        ...prev,
-        [category.id]:
-          page === 1 ? newSongs : [...(prev[category.id] || []), ...newSongs],
-      }));
-
-      setPages((prev) => ({ ...prev, [category.id]: page }));
-      setHasMore((prev) => ({
-        ...prev,
-        [category.id]: newSongs.length === 20,
-      }));
-    } catch (error) {
-      console.error(`Error loading songs for ${category.title}:`, error);
-    } finally {
-      setLoading((prev) => ({ ...prev, [category.id]: false }));
-    }
-  };
-
-  useEffect(() => {
-    categories.forEach((category) => {
-      loadSongsForCategory(category);
-    });
-  }, []);
-
   const handleLoadMore = (category) => {
     if (hasMore[category.id] && !loading[category.id]) {
       loadSongsForCategory(category, (pages[category.id] || 1) + 1);
@@ -1321,125 +1762,38 @@ const Home = ({ onSongSelect, username }) => {
           pointerEvents: 'none'
         }} />
 
-        <Box sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          alignItems: { xs: 'flex-start', sm: 'center' },
-          justifyContent: 'space-between',
-          gap: 2,
-          position: 'relative',
-          zIndex: 1
-        }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', gap: 2, position: 'relative', zIndex: 1 }}>
           <Box>
-            <Typography 
-              variant="h3" 
-              component="h1"
-              sx={{
-                fontWeight: 800,
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                color: theme.palette.mode === 'dark' ? 'white' : 'white',
-                textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                mb: 1
-              }}
-            >
+            <Typography variant="h3" component="h1" sx={{ fontWeight: 800, fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' }, color: theme.palette.mode === 'dark' ? 'white' : 'white', textShadow: '0 2px 4px rgba(0,0,0,0.1)', mb: 1 }}>
               Welcome{username ? `, ${username}` : ''}
             </Typography>
-            <Typography 
-              variant="subtitle1"
-              sx={{ 
-                color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.8)' : 'white',
-                fontSize: { xs: '1rem', sm: '1.1rem' },
-                maxWidth: '600px',
-                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-              }}
-            >
+            <Typography variant="subtitle1" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.8)' : 'white', fontSize: { xs: '1rem', sm: '1.1rem' }, maxWidth: '600px', textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
               Discover and enjoy your favorite music with our curated playlists and personalized recommendations
             </Typography>
           </Box>
 
-          <Paper
-            onClick={() => navigate('/search')}
-            elevation={0}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              bgcolor: 'rgba(255,255,255,0.15)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '16px',
-              p: '12px 24px',
-              cursor: 'pointer',
-              border: '1px solid rgba(255,255,255,0.2)',
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                bgcolor: 'rgba(255,255,255,0.25)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-              }
-            }}
-          >
-            <Box 
-  sx={{
-    display: 'flex',
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: { xs: '120%', sm: '70%' },
-    minWidth: { xs: '290px', sm: '600px' },
-    margin: '0 auto'
-  }}
->
-  <SearchIcon sx={{ color: 'white', mr: 1 }} />
-  <Typography 
-    variant="body1" 
-    sx={{ 
-      color: 'white', 
-      display: { xs: 'block', sm: 'block' }
-    }}
-  >
-    Search for music...
-  </Typography>
-</Box>
+          <Paper onClick={() => navigate('/search')} elevation={0} sx={{ display: 'flex', alignItems: 'center', bgcolor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', borderRadius: '16px', p: '12px 24px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.2)', transition: 'all 0.2s ease-in-out', '&:hover': { bgcolor: 'rgba(255,255,255,0.25)', transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: { xs: '120%', sm: '70%' }, minWidth: { xs: '290px', sm: '600px' }, margin: '0 auto' }}>
+              <SearchIcon sx={{ color: 'white', mr: 1 }} />
+              <Typography variant="body1" sx={{ color: 'white', display: { xs: 'block', sm: 'block' } }}>
+                Search for music...
+              </Typography>
+            </Box>
 
           </Paper>
         </Box>
       </Box>
 
       {/* Top Charts section */}
-      <Box sx={{ 
-        mb: { xs: 3, sm: 4 },
-        overflowX: 'hidden',
-        px: 1,
-      }}>
-        <Typography 
-          variant="h6"
-          sx={{ 
-            fontSize: { xs: '2rem', sm: '2.25rem' },
-            fontWeight: 600,
-            mb: { xs: 2, sm: 2.5 },
-            color: '#4DC1CC',
-          }}
-        >
+      <Box sx={{ mb: { xs: 3, sm: 4 }, overflowX: 'hidden', px: 1 }}>
+        <Typography variant="h6" sx={{ fontSize: { xs: '2rem', sm: '2.25rem' }, fontWeight: 600, mb: { xs: 2, sm: 2.5 }, color: '#4DC1CC' }}>
           Top Charts
         </Typography>
 
-        <Box sx={{ 
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-          gap: { xs: 1.5, md: 11 },
-          maxWidth: '100%',
-          overflowX: 'hidden',
-        }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: { xs: 1.5, md: 11 }, maxWidth: '100%', overflowX: 'hidden' }}>
           {topCharts.map((chart) => (
-            <Box
-              key={chart.link}
-              sx={{
-                width: '100%',
-              }}
-            >
-              <ChartCard 
-                title={chart.title} 
-                chart={chart} 
-                onSongSelect={onSongSelect}
-              />
+            <Box key={chart.link} sx={{ width: '100%' }}>
+              <ChartCard title={chart.title} chart={chart} onSongSelect={onSongSelect} />
             </Box>
           ))}
         </Box>
@@ -1448,60 +1802,59 @@ const Home = ({ onSongSelect, username }) => {
       {/* Recently Played section */}
       {recentlyPlayed?.length > 0 && (
         <Box sx={{ mt: { xs: 3, sm: 4, md: 5 } }}>
-          <SwipeableSection
-            title="Recently Played"
-            songs={recentlyPlayed}
-            onSongSelect={onSongSelect}
+          <AlbumSection 
+            title="Recently Played" 
+            albums={recentlyPlayed.map(song => ({
+              id: song.id,
+              name: song.name,
+              image: song.image,
+              primaryArtists: song.primaryArtists,
+              songs: [song]
+            }))} 
+            onAlbumSelect={(album) => onSongSelect(album.songs[0])}
             onLoadMore={() => {}}
             hasMore={false}
           />
         </Box>
       )}
 
-      {/* Categories section */}
-      {categories.map((category) => (
-        <SwipeableSection
+      {/* Mix Categories and Albums */}
+      {categories.map((category, index) => (
+        <React.Fragment key={category.id}>
+          <SwipeableSection
+            title={category.title}
+            songs={categoryData[category.id] || []}
+            onSongSelect={onSongSelect}
+            onLoadMore={() => handleLoadMore(category)}
+            hasMore={hasMore[category.id]}
+          />
+
+          {/* Insert album category after each regular category */}
+          {albumCategories[index] && (
+            <AlbumSection
+              key={albumCategories[index].id}
+              title={albumCategories[index].title}
+              albums={albumData[albumCategories[index].id] || []}
+              onAlbumSelect={handleAlbumClick}
+              onLoadMore={() => handleLoadMore(albumCategories[index])}
+              hasMore={hasMore[albumCategories[index].id]}
+            />
+          )}
+        </React.Fragment>
+      ))}
+
+      {/* Render remaining album categories */}
+      {albumCategories.slice(categories.length).map((category) => (
+        <AlbumSection
           key={category.id}
           title={category.title}
-          songs={categoryData[category.id] || []}
-          onSongSelect={onSongSelect}
+          albums={albumData[category.id] || []}
+          onAlbumSelect={handleAlbumClick}
           onLoadMore={() => handleLoadMore(category)}
           hasMore={hasMore[category.id]}
         />
       ))}
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={6000}
-        onClose={() => {
-          console.log('Snackbar closed');
-          setOpenSnackbar(false);
-        }}
-        message={snackbarMessage}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        sx={{
-          zIndex: 9999, // Ensure it's on top of everything
-          width: snackbarStyle.width,
-          left: snackbarStyle.left,
-          transform: snackbarStyle.transform,
-          top: snackbarStyle.top,
-          '& .MuiSnackbarContent-root': {
-            minWidth: '300px',
-            width: '100%',
-            fontSize: '1.1rem',
-            justifyContent: 'center',
-            padding: '16px',
-            borderRadius: '12px',
-            backgroundColor: localStorage.getItem('currentSnackbarColor') || 'rgba(156, 39, 176, 0.9)', // Use dynamic color
-            color: 'white',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
-            textAlign: 'center',
-            fontStyle: 'italic',
-            whiteSpace: 'pre-line', // Preserve line breaks
-            lineHeight: '1.5',
-            wordWrap: 'break-word',
-          }
-        }}
-      />
+      <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={() => { console.log('Snackbar closed'); setOpenSnackbar(false); }} message={snackbarMessage} anchorOrigin={{ vertical: 'top', horizontal: 'center' }} sx={{ zIndex: 9999, width: snackbarStyle.width, left: snackbarStyle.left, transform: snackbarStyle.transform, top: snackbarStyle.top, '& .MuiSnackbarContent-root': { minWidth: '300px', width: '100%', fontSize: '1.1rem', justifyContent: 'center', padding: '16px', borderRadius: '12px', backgroundColor: localStorage.getItem('currentSnackbarColor') || 'rgba(156, 39, 176, 0.9)', color: 'white', boxShadow: '0 4px 6px rgba(0,0,0,0.2)', textAlign: 'center', fontStyle: 'italic', whiteSpace: 'pre-line', lineHeight: '1.5', wordWrap: 'break-word' } }} />
     </Box>
   );
 };
