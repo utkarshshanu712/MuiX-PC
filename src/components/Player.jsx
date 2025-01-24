@@ -306,7 +306,7 @@ const Player = ({
   const { enqueueSnackbar } = useSnackbar();
 
   // Refs
-  const audioRef = useRef(null);
+  const audioRef = useRef(new Audio());
 
   // State management
   const [isPlaying, setIsPlaying] = useState(false);
@@ -352,15 +352,134 @@ const Player = ({
   }, [currentTrack]);
 
   useEffect(() => {
-    audioRef.current = new Audio();
-    
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
+    if (!currentTrack) return;
+
+    const audio = audioRef.current;
+    let playPromise;
+
+    const loadAndPlayTrack = async () => {
+      try {
+        // Determine audio URL with comprehensive validation
+        let audioUrl;
+        if (currentTrack.isLocal && currentTrack.audioUrl) {
+          const localValidation = await validateAudioSource(currentTrack.audioUrl);
+          if (localValidation.valid) {
+            audioUrl = currentTrack.audioUrl;
+          }
+        }
+
+        // Fallback to download URLs
+        if (!audioUrl && currentTrack.downloadUrl) {
+          const downloadUrl = getUrlForQuality(currentTrack.downloadUrl, streamingQuality);
+          
+          if (downloadUrl) {
+            const urlValidation = await validateAudioSource(downloadUrl);
+            if (urlValidation.valid) {
+              audioUrl = downloadUrl;
+            }
+          }
+        }
+
+        // Validate and set audio source
+        if (!audioUrl) {
+          throw new Error('No valid audio source found');
+        }
+
+        // Store current position before changing source
+        const currentPosition = audio.currentTime;
+
+        // Detect and set MIME type
+        const mimeType = detectMimeType(audioUrl);
+
+        // Reset and prepare audio
+        audio.pause();
+        audio.src = audioUrl;
+        audio.type = mimeType;
+        audio.load();
+
+        // Restore position after loading new source
+        audio.currentTime = currentPosition;
+
+        // Attempt playback if it was playing
+        if (isPlaying) {
+          playPromise = audio.play();
+          
+          if (playPromise !== undefined) {
+            await playPromise.catch(error => {
+              if (error.name === 'AbortError') return;
+              
+              console.error('Playback error:', error);
+              enqueueSnackbar(`Failed to play audio: ${error.message}`, { variant: 'error' });
+              setIsPlaying(false);
+              setError(error.message || 'Playback failed');
+            });
+          }
+        }
+
+        // Clear any previous errors
+        setError(null);
+
+      } catch (err) {
+        console.error('Track loading error:', err);
+        enqueueSnackbar(`Error loading track: ${err.message}`, { variant: 'error' });
+        setIsPlaying(false);
+        setError(err.message);
       }
     };
-  }, []);
+
+    loadAndPlayTrack();
+
+    return () => {
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            if (audio) {
+              const currentPosition = audio.currentTime;
+              audio.pause();
+              audio.src = '';
+              audio.currentTime = currentPosition;
+            }
+          })
+          .catch(() => {
+            if (audio) {
+              audio.src = '';
+            }
+          });
+      } else if (audio) {
+        const currentPosition = audio.currentTime;
+        audio.pause();
+        audio.src = '';
+        audio.currentTime = currentPosition;
+      }
+    };
+  }, [currentTrack, streamingQuality, isPlaying, enqueueSnackbar]);
+
+  const handlePlayPause = useCallback(async () => {
+    if (error) return;
+
+    const audio = audioRef.current;
+    
+    try {
+      if (isPlaying) {
+        const currentPosition = audio.currentTime;
+        await audio.pause();
+        audio.currentTime = currentPosition;
+      } else {
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+        }
+      }
+      setIsPlaying(!isPlaying);
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        return;
+      }
+      console.error('Error playing audio:', error);
+      setError(error.message || 'Failed to play audio. Please try again.');
+      setIsPlaying(false);
+    }
+  }, [error, isPlaying]);
 
   const handleTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
@@ -407,17 +526,12 @@ const Player = ({
       }
     };
 
-    audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('loadedmetadata', () => {
-      if (!isNaN(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    });
+    audio.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [handleTimeUpdate, handleNext, queue.length, queuePosition]);
 
@@ -465,120 +579,18 @@ const Player = ({
     if (!currentTrack) return;
 
     const audio = audioRef.current;
-    let playPromise;
+    audio.src = currentTrack?.downloadUrl || '';
 
-    const loadAndPlayTrack = async () => {
-      try {
-        // Determine audio URL with comprehensive validation
-        let audioUrl;
-        if (currentTrack.isLocal && currentTrack.audioUrl) {
-          const localValidation = await validateAudioSource(currentTrack.audioUrl);
-          if (localValidation.valid) {
-            audioUrl = currentTrack.audioUrl;
-          }
-        }
-
-        // Fallback to download URLs
-        if (!audioUrl && currentTrack.downloadUrl) {
-          const downloadUrl = getUrlForQuality(currentTrack.downloadUrl, streamingQuality);
-          
-          if (downloadUrl) {
-            const urlValidation = await validateAudioSource(downloadUrl);
-            if (urlValidation.valid) {
-              audioUrl = downloadUrl;
-            }
-          }
-        }
-
-        // Validate and set audio source
-        if (!audioUrl) {
-          throw new Error('No valid audio source found');
-        }
-
-        // Detect and set MIME type
-        const mimeType = detectMimeType(audioUrl);
-
-        // Reset and prepare audio
-        audio.pause();
-        audio.src = audioUrl;
-        audio.type = mimeType;
-        audio.load();
-
-        // Attempt playback
-        if (isPlaying) {
-          playPromise = audio.play();
-          
-          if (playPromise !== undefined) {
-            await playPromise.catch(error => {
-              if (error.name === 'AbortError') return;
-              
-              console.error('Playback error:', error);
-              enqueueSnackbar(`Failed to play audio: ${error.message}`, { variant: 'error' });
-              setIsPlaying(false);
-              setError(error.message || 'Playback failed');
-            });
-          }
-        }
-
-        // Clear any previous errors
-        setError(null);
-
-      } catch (err) {
-        console.error('Track loading error:', err);
-        enqueueSnackbar(`Error loading track: ${err.message}`, { variant: 'error' });
-        setIsPlaying(false);
-        setError(err.message);
-      }
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration);
     };
 
-    loadAndPlayTrack();
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     return () => {
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            if (audio) {
-              audio.pause();
-              audio.src = '';
-            }
-          })
-          .catch(() => {
-            if (audio) {
-              audio.src = '';
-            }
-          });
-      } else if (audio) {
-        audio.pause();
-        audio.src = '';
-      }
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
-  }, [currentTrack, streamingQuality, isPlaying, enqueueSnackbar]);
-
-  const handlePlayPause = useCallback(async () => {
-    if (error) return;
-
-    const audio = audioRef.current;
-    
-    try {
-      if (isPlaying) {
-        await audio.pause();
-      } else {
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          await playPromise;
-        }
-      }
-      setIsPlaying(!isPlaying);
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        // Ignore AbortError as it's expected when quickly switching tracks
-        return;
-      }
-      console.error('Error playing audio:', error);
-      setError(error.message || 'Failed to play audio. Please try again.');
-      setIsPlaying(false);
-    }
-  }, [error, isPlaying]);
+  }, [currentTrack]);
 
   const handleVolumeChange = useCallback((event, newValue) => {
     if (audioRef.current) {

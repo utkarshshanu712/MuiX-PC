@@ -344,69 +344,68 @@ function AppContent() {
     setUsername(name);
   };
 
-  if (!username) {
-    return (
-      <Box sx={{ height: '100vh', bgcolor: 'background.default', color: 'text.primary' }}>
-        <main style={{ height: '100vh', overflow: 'auto', position: 'relative' }}>
-          <Routes>
-            <Route path="/login" element={<Login onLogin={handleLogin} />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </main>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       <CssBaseline />
       
-      <Sidebar appName="MuiX" username={username} />
+      {!username ? (
+        <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          <Routes>
+            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Box>
+      ) : (
+        <>
+          <Sidebar appName="MuiX" username={username} />
+          <Box
+            component="main"
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              bgcolor: "#121212",
+            }}
+          >
+            <Routes key={navigationKey}>
+              <Route path="/" element={<Home onSongSelect={handleSongSelect} username={username} />} />
+              <Route path="/login" element={<Navigate to="/" replace />} />
+              <Route path="/for-you" element={<ForYou />} />
+              <Route path="/downloads" element={<Downloads />} />
+              <Route path="/library" element={<Library />} />
+              <Route path="/create-playlist" element={<CreatePlaylist />} />
+              <Route path="/search" element={<Search onSongSelect={handleSongSelect} />} />
+              <Route path="/playlist/:url" element={<Playlist onSongSelect={handleSongSelect} />} />
+              <Route path="/liked-songs" element={<LikedSongs onSongSelect={handleSongSelect} />} />
+              <Route path="/artist/:id" element={<Artist onSongSelect={handleSongSelect} />} />
+              <Route path="/album/:id" element={<Album onSongSelect={handleSongSelect} />} />
+              <Route path="/top-artists" element={<TopArtists />} />
+              <Route path="/following" element={<Following />} />
+              <Route path="/top-playlists" element={<TopPlaylists />} />
+              <Route path="/playlist/top/:id" element={<TopPlaylistDetails onSongSelect={handleSongSelect} />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Box>
 
-      <Box
-              component="main"
-              sx={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-                bgcolor: "#121212",
-              }}
-            >
-        <Routes key={navigationKey}>
-          <Route path="/" element={<Home onSongSelect={handleSongSelect} username={username} />} />
-          <Route path="/for-you" element={<ForYou />} />
-          <Route path="/downloads" element={<Downloads />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/create-playlist" element={<CreatePlaylist />} />
-          <Route path="/search" element={<Search onSongSelect={handleSongSelect} />} />
-          <Route path="/playlist/:url" element={<Playlist onSongSelect={handleSongSelect} />} />
-          <Route path="/liked-songs" element={<LikedSongs onSongSelect={handleSongSelect} />} />
-          <Route path="/artist/:id" element={<Artist onSongSelect={handleSongSelect} />} />
-          <Route path="/album/:id" element={<Album onSongSelect={handleSongSelect} />} />
-          <Route path="/top-artists" element={<TopArtists />} />
-          <Route path="/following" element={<Following />} />
-          <Route path="/top-playlists" element={<TopPlaylists />} />
-          <Route path="/playlist/top/:id" element={<TopPlaylistDetails onSongSelect={handleSongSelect} />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </Box>
+          {/* Bottom Navigation for Mobile */}
+          {isMobile && !isForYouPage && <BottomNav />}
 
-      {/* Bottom Navigation for Mobile */}
-      {isMobile && !isForYouPage && <BottomNav />}
-
-      {/* Audio Players */}
-      {!isDownloadsActive && !isForYouPage && (
-        <Player
-          currentTrack={currentTrack}
-          onNext={handleNext}
-          onPrevious={handlePrevious}
-          hasNext={queue.length > 0}
-          hasPrevious={playHistory.length > 0}
-          queue={queue}
-          onQueueItemClick={handleQueueItemClick}
-          onReorderQueue={handleReorderQueue}
-        />
+          {/* Audio Players */}
+          {!isDownloadsActive && !isForYouPage && (
+            <Player
+              currentTrack={currentTrack}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+              hasNext={queue.length > 0}
+              hasPrevious={playHistory.length > 0}
+              queue={queue}
+              onQueueItemClick={handleQueueItemClick}
+              onReorderQueue={handleReorderQueue}
+            />
+          )}
+        </>
       )}
     </Box>
   );
