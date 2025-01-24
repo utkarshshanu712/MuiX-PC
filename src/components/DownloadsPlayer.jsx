@@ -8,6 +8,12 @@ import {
   useMediaQuery,
   Menu,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  List,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import {
   PlayArrow,
@@ -19,6 +25,7 @@ import {
   Download,
   Timer,
 } from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
 import { useDownloadsAudio } from '../contexts/DownloadsAudioContext';
 import { useAudio } from '../contexts/AudioContext';
 import giphy from '../assets/giphy.gif';
@@ -54,6 +61,7 @@ const DownloadsPlayer = () => {
     handleVolumeChange,
     handleToggleMute,
     isDownloadsActive,
+    queue = [], // Provide default empty array
   } = useDownloadsAudio();
 
   const { setShowPlayer: setShowMainPlayer } = useAudio();
@@ -63,6 +71,11 @@ const DownloadsPlayer = () => {
     if (isDownloadsActive) {
       setShowMainPlayer(false);
     }
+    return () => {
+      if (isDownloadsActive) {
+        handlePause();
+      }
+    };
   }, [isDownloadsActive, setShowMainPlayer]);
 
   useEffect(() => {
@@ -92,11 +105,17 @@ const DownloadsPlayer = () => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const handlePlayPause = () => {
-    if (isPlaying) {
-      handlePause();
-    } else if (currentTrack) {
-      handlePlay(currentTrack);
+  const handlePlayPause = async () => {
+    if (!currentTrack) return;
+    
+    try {
+      if (isPlaying) {
+        await handlePause();
+      } else {
+        await handlePlay(currentTrack);
+      }
+    } catch (error) {
+      console.error('Error in handlePlayPause:', error);
     }
   };
 

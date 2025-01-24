@@ -14,6 +14,7 @@ import {
   MenuItem,
   useTheme,
   useMediaQuery,
+  Button
 } from '@mui/material';
 import {
   PlayArrow,
@@ -117,48 +118,84 @@ const Downloads = () => {
       // Create an object URL for the audio blob
       const objectUrl = URL.createObjectURL(song.audioBlob);
 
+      // Get the remaining songs for queue
+      const currentIndex = downloads.findIndex(track => track.id === song.id);
+      const remainingTracks = downloads.slice(currentIndex + 1).map(track => ({
+        ...track,
+        isLocal: true,
+        audioUrl: null, // Will be loaded when played
+        downloadUrl: null
+      }));
+
       const offlineTrack = {
         ...song,
         isLocal: true,
         audioUrl: objectUrl,
         downloadUrl: null,
+        _cleanup: () => URL.revokeObjectURL(objectUrl)
       };
 
-      handlePlay(offlineTrack);
+      handlePlay(offlineTrack, remainingTracks);
     } catch (error) {
       console.error('Failed to play song:', error);
       enqueueSnackbar('Failed to play song: ' + error.message, { variant: 'error' });
     }
   };
 
-  const handlePlayAll = (shuffle = false) => {
+  const handlePlayAll = async (shuffle = false) => {
     if (downloads.length === 0) return;
     
-    let tracks = downloads.map(song => ({
-      id: song.id,
-      name: song.title || song.name,
-      title: song.title || song.name,
-      primaryArtists: song.artist,
-      artist: song.artist,
-      image: [{ link: song.coverUrl }],
-      downloadUrl: null,
-      isLocal: true,
-      audioUrl: song.audioUrl,
-      duration: song.duration,
-      type: 'song',
-      playCount: 0,
-      language: song.language || 'unknown'
-    }));
-
-    if (shuffle) {
-      for (let i = tracks.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+    try {
+      let tracksToPlay = [...downloads];
+      
+      if (shuffle) {
+        // Fisher-Yates shuffle algorithm
+        for (let i = tracksToPlay.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [tracksToPlay[i], tracksToPlay[j]] = [tracksToPlay[j], tracksToPlay[i]];
+        }
       }
-    }
 
-    const [firstTrack, ...remainingTracks] = tracks;
-    handlePlay(firstTrack, remainingTracks);
+      // Get the first song's audio blob
+      const firstSong = tracksToPlay[0];
+      const storedSong = await audioStorage.getSong(firstSong.id);
+      if (!storedSong || !storedSong.audioBlob) {
+        throw new Error('Song data not found');
+      }
+
+      // Create object URL for the first track
+      const objectUrl = URL.createObjectURL(storedSong.audioBlob);
+      const firstTrack = {
+        ...firstSong,
+        isLocal: true,
+        audioUrl: objectUrl,
+        downloadUrl: null,
+        _cleanup: () => URL.revokeObjectURL(objectUrl)
+      };
+
+      // Create remaining tracks array
+      const remainingTracks = tracksToPlay.slice(1).map(song => ({
+        id: song.id,
+        name: song.title || song.name,
+        title: song.title || song.name,
+        primaryArtists: song.artist,
+        artist: song.artist,
+        image: [{ link: song.coverUrl }],
+        downloadUrl: null,
+        isLocal: true,
+        audioUrl: null,
+        duration: song.duration,
+        type: 'song',
+        playCount: 0,
+        language: song.language || 'unknown'
+      }));
+
+      // Start playback with the first track and queue the rest
+      await handlePlay(firstTrack, remainingTracks);
+    } catch (error) {
+      console.error('Failed to start playback:', error);
+      enqueueSnackbar('Failed to start playback: ' + error.message, { variant: 'error' });
+    }
   };
 
   const handleDelete = async (songId) => {
@@ -252,30 +289,23 @@ const Downloads = () => {
 
       {/* Play Buttons */}
       {downloads.length > 0 && (
-        <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-          <IconButton
+        <Box sx={{ p: 2, display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<PlayArrow />}
             onClick={() => handlePlayAll(false)}
-            sx={{
-              p: { xs: 1, sm: 2 },
-              bgcolor: '#1db954',
-              '&:hover': { bgcolor: '#1ed760', transform: 'scale(1.04)' },
-              transition: 'all 0.2s ease'
-            }}
+            disabled={downloads.length === 0}
           >
-            <PlayArrow sx={{ fontSize: { xs: 30, sm: 40 }, color: 'white' }} />
-          </IconButton>
-
-          <IconButton
+            Play All
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Shuffle />}
             onClick={() => handlePlayAll(true)}
-            sx={{
-              p: { xs: 1.5, sm: 2 },
-              bgcolor: '#282828',
-              '&:hover': { bgcolor: '#333', transform: 'scale(1.04)' },
-              transition: 'all 0.2s ease'
-            }}
+            disabled={downloads.length === 0}
           >
-            <Shuffle sx={{ fontSize: { xs: 24, sm: 30 }, color: '#1db954' }} />
-          </IconButton>
+            Shuffle All
+          </Button>
         </Box>
       )}
 

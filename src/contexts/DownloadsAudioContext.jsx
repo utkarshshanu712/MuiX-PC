@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useRef, useState, useEffect } from 'react';
+import React, { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
 import { useAudio } from './AudioContext';
 import { useLocation } from 'react-router-dom';
+import { audioStorage } from '../services/AudioStorage';
 
 const DownloadsAudioContext = createContext();
 
@@ -9,147 +10,175 @@ export const DownloadsAudioProvider = ({ children }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [queue, setQueue] = useState([]);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
-  const [showOnlinePlayer, setShowOnlinePlayer] = useState(false);
   const [isDownloadsActive, setIsDownloadsActive] = useState(false);
   const audioRef = useRef(new Audio());
-  const { handlePause: pauseMainPlayer } = useAudio();
+  const { handlePause: pauseMainPlayer, setShowPlayer: setShowMainPlayer } = useAudio();
   const location = useLocation();
 
-  // Track when user leaves downloads page
-  useEffect(() => {
-    const isOnDownloadsPage = location.pathname === '/downloads';
-    if (!isOnDownloadsPage && isDownloadsActive) {
-      // Stop downloads player when leaving downloads page
-      handlePause();
-      setIsDownloadsActive(false);
-    }
-  }, [location.pathname]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-
-    const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
-    };
-
-    const handleEnded = () => {
-      if (queue.length > 0) {
-        const nextTrack = queue[0];
-        const remainingQueue = queue.slice(1);
-        setQueue(remainingQueue);
-        handlePlay(nextTrack, remainingQueue);
-      } else {
-        setIsPlaying(false);
-        setIsDownloadsActive(false);
-      }
-    };
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, [queue]);
-
-  const handlePlay = async (track, playlist = []) => {
+  const handlePlay = useCallback(async (track) => {
     try {
-      // Pause the main player and set downloads as active
+      if (!track) return;
+
+      // Pause main player and any other audio
       if (pauseMainPlayer) {
         pauseMainPlayer();
       }
       setIsDownloadsActive(true);
-      setShowOnlinePlayer(false);
+      setShowMainPlayer(false);
+
+      // Set state first to avoid race conditions
+      setCurrentTrack(track);
 
       const audio = audioRef.current;
 
-      // Clean up previous object URL if exists
-      if (currentTrack?._cleanup) {
-        currentTrack._cleanup();
-      }
-
-      if (currentTrack?.id === track.id) {
-        if (isPlaying) {
-          audio.pause();
-          setIsPlaying(false);
-        } else {
-          await audio.play();
-          setIsPlaying(true);
-        }
-        return;
-      }
-
-      // Set current track and queue
-      setCurrentTrack(track);
-      setQueue(playlist.filter(item => item.id !== track.id));
-
-      // Load and play new track
-      if (track.audioUrl) {
-        audio.src = track.audioUrl;
-        audio.load();
+      // If same track, just resume playback
+      if (currentTrack?.id === track.id && audio.src) {
         try {
           await audio.play();
           setIsPlaying(true);
+          return;
         } catch (error) {
-          console.error('Playback error:', error);
-          setIsPlaying(false);
-          throw new Error('Failed to play audio');
+          console.error('Error resuming track:', error);
+          // Continue to reload the track if resume fails
         }
-      } else {
-        throw new Error('No audio URL available');
+      }
+
+      // Clean up previous audio state
+      if (audio.src) {
+        const oldSrc = audio.src;
+        audio.src = '';
+        URL.revokeObjectURL(oldSrc);
+      }
+
+      try {
+        // Get the audio blob from IndexedDB
+        const storedTrack = await audioStorage.getSong(track.id);
+        if (!storedTrack || !storedTrack.audioBlob) {
+          throw new Error('Track data not found');
+        }
+
+        // Create new audio URL and prepare track
+        const audioUrl = URL.createObjectURL(storedTrack.audioBlob);
+        
+        // Set up audio
+        audio.src = audioUrl;
+        audio.volume = isMuted ? 0 : volume;
+        audio.load();
+
+        // Wait for audio to be loaded
+        await new Promise((resolve, reject) => {
+          const loadHandler = () => {
+            audio.removeEventListener('loadeddata', loadHandler);
+            audio.removeEventListener('error', errorHandler);
+            resolve();
+          };
+          
+          const errorHandler = (error) => {
+            audio.removeEventListener('loadeddata', loadHandler);
+            audio.removeEventListener('error', errorHandler);
+            reject(error);
+          };
+          
+          audio.addEventListener('loadeddata', loadHandler);
+          audio.addEventListener('error', errorHandler);
+        });
+
+        await audio.play();
+        setIsPlaying(true);
+      } catch (error) {
+        console.error('Error playing track:', error);
+        if (audio.src) {
+          URL.revokeObjectURL(audio.src);
+          audio.src = '';
+        }
+        setIsPlaying(false);
+        throw error;
       }
     } catch (error) {
-      console.error('Play error:', error);
+      console.error('Error in handlePlay:', error);
       setIsPlaying(false);
     }
-  };
+  }, [currentTrack, isMuted, volume, pauseMainPlayer]);
 
-  // Clean up object URLs when component unmounts or track changes
-  useEffect(() => {
-    return () => {
-      if (currentTrack?._cleanup) {
-        currentTrack._cleanup();
+  const handlePlayAll = useCallback(async (shuffle = false) => {
+    try {
+      const songs = await audioStorage.getAllSongs();
+      if (songs.length === 0) return;
+
+      let tracksToPlay = [...songs];
+      if (shuffle) {
+        tracksToPlay.sort(() => Math.random() - 0.5);
       }
-    };
-  }, [currentTrack]);
 
-  const handlePause = () => {
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
+      const firstTrack = {
+        ...tracksToPlay[0].metadata,
+        isLocal: true
+      };
+
+      await handlePlay(firstTrack);
+    } catch (error) {
+      console.error('Error in handlePlayAll:', error);
+    }
+  }, [handlePlay]);
+
+  const handleNext = useCallback(async () => {
+    try {
+      // Get all songs and find next track
+      const songs = await audioStorage.getAllSongs();
+      if (songs.length === 0) return;
+
+      const currentIndex = songs.findIndex(song => song.metadata.id === currentTrack?.id);
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= songs.length) {
+        nextIndex = 0; // Loop back to start
+      }
+
+      const nextTrack = {
+        ...songs[nextIndex].metadata,
+        isLocal: true
+      };
+
+      await handlePlay(nextTrack);
+    } catch (error) {
+      console.error('Error in handleNext:', error);
       setIsPlaying(false);
     }
-  };
+  }, [currentTrack, handlePlay]);
 
-  const handleNext = () => {
-    if (queue.length > 0) {
-      const nextTrack = queue[0];
-      const remainingQueue = queue.slice(1);
-      setQueue(remainingQueue);
-      handlePlay(nextTrack, remainingQueue);
-    }
-  };
+  const handlePrevious = useCallback(async () => {
+    try {
+      // Get all songs and find previous track
+      const songs = await audioStorage.getAllSongs();
+      if (songs.length === 0) return;
 
-  const handlePrevious = () => {
-    if (currentTime > 3) {
-      handleSeek(0);
-    } else if (queue.length > 0) {
-      const previousTrack = queue[queue.length - 1];
-      const remainingQueue = queue.slice(0, -1);
-      setQueue(remainingQueue);
-      handlePlay(previousTrack, remainingQueue);
+      const currentIndex = songs.findIndex(song => song.metadata.id === currentTrack?.id);
+      let prevIndex = currentIndex - 1;
+      if (prevIndex < 0) {
+        prevIndex = songs.length - 1; // Loop back to end
+      }
+
+      const prevTrack = {
+        ...songs[prevIndex].metadata,
+        isLocal: true
+      };
+
+      await handlePlay(prevTrack);
+    } catch (error) {
+      console.error('Error in handlePrevious:', error);
+      setIsPlaying(false);
     }
-  };
+  }, [currentTrack, handlePlay]);
+
+  const handleEnded = useCallback(async () => {
+    try {
+      await handleNext();
+    } catch (error) {
+      console.error('Error in handleEnded:', error);
+      setIsPlaying(false);
+    }
+  }, [handleNext]);
 
   const handleSeek = (time) => {
     const audio = audioRef.current;
@@ -183,6 +212,96 @@ export const DownloadsAudioProvider = ({ children }) => {
     }
   };
 
+  const handleShuffle = useCallback(async () => {
+    try {
+      // Get all songs from IndexedDB
+      const songs = await audioStorage.getAllSongs();
+      if (songs.length === 0) return;
+
+      // Create a shuffled copy of songs
+      const shuffledSongs = [...songs]
+        .sort(() => Math.random() - 0.5);
+
+      // Get first track metadata (audioUrl will be created in handlePlay)
+      const firstTrack = {
+        ...shuffledSongs[0].metadata,
+        isLocal: true
+      };
+
+      // Play first track
+      await handlePlay(firstTrack);
+    } catch (error) {
+      console.error('Error in handleShuffle:', error);
+      setIsPlaying(false);
+    }
+  }, [handlePlay]);
+
+  const handlePause = useCallback(async () => {
+    try {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    } catch (error) {
+      console.error('Error in handlePause:', error);
+      setIsPlaying(false);
+    }
+  }, []);
+
+  // Track when user leaves downloads page
+  useEffect(() => {
+    const isOnDownloadsPage = location.pathname === '/downloads';
+    setIsDownloadsActive(isOnDownloadsPage);
+    if (!isOnDownloadsPage) {
+      handlePause();
+      setShowMainPlayer(true);
+    } else {
+      setShowMainPlayer(false);
+    }
+  }, [location.pathname]);
+
+  // Handle audio events
+  useEffect(() => {
+    const audio = audioRef.current;
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handleDurationChange = () => {
+      setDuration(audio.duration);
+    };
+
+    const handleError = (event) => {
+      console.error('Audio error:', event);
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('durationchange', handleDurationChange);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('durationchange', handleDurationChange);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
+    };
+  }, [handleEnded]);
+
+  // Ensure audio is paused when component unmounts
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    };
+  }, []);
+
   return (
     <DownloadsAudioContext.Provider
       value={{
@@ -192,7 +311,6 @@ export const DownloadsAudioProvider = ({ children }) => {
         duration,
         volume,
         isMuted,
-        showOnlinePlayer,
         isDownloadsActive,
         handlePlay,
         handlePause,
@@ -201,8 +319,9 @@ export const DownloadsAudioProvider = ({ children }) => {
         handleSeek,
         handleVolumeChange,
         handleToggleMute,
-        setShowOnlinePlayer,
-        setIsDownloadsActive,
+        setShowMainPlayer,
+        handlePlayAll,
+        handleShuffle,
       }}
     >
       {children}
