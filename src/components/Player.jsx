@@ -16,22 +16,30 @@ import {
   Menu,
   MenuItem,
   Badge,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Avatar,
 } from "@mui/material";
 import {
-  PlayArrow,
   Pause,
+  PlayArrow,
   SkipNext,
   SkipPrevious,
   VolumeUp,
   VolumeOff,
+  VolumeMute,
   QueueMusic,
-  Close,
   Timer,
   Favorite,
   FavoriteBorder,
-  PlaylistAdd,
-  Download,
   Lyrics,
+  Download,
+  ExpandLess,
+  ExpandMore,
+  PlaylistAdd,
+  Close,
 } from "@mui/icons-material";
 import ExpandedPlayer from "./ExpandedPlayer";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -40,6 +48,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import PlaylistMenu from "./PlaylistMenu";
+import { audioStorage } from '../services/AudioStorage';
 
 // Function to create ID3v2 tag buffer
 const createID3v2Buffer = (metadata, imageBuffer) => {
@@ -299,187 +308,158 @@ const Player = ({
   onQueueItemClick = () => {},
   onLyricsClick = () => {},
 }) => {
-  // Context and hooks
-  const { streamingQuality, downloadQuality, getUrlForQuality } = useSettings();
-  const { addToRecentlyPlayed } = useUserPreferences();
-  const { likedSongs, toggleLikeSong } = useLibrary();
-  const { enqueueSnackbar } = useSnackbar();
+  // State hooks
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [playbackError, setPlaybackError] = useState(null);
+  const [error, setError] = useState(null);
+  const [playHistory, setPlayHistory] = useState([]);
+  const [isLiked, setIsLiked] = useState(false);
+  const [playlistAnchorEl, setPlaylistAnchorEl] = useState(null);
+  const [selectedTrack, setSelectedTrack] = useState(null);
+  const [timerAnchorEl, setTimerAnchorEl] = useState(null);
+  const [timerDuration, setTimerDuration] = useState(null);
+  const [timerRemaining, setTimerRemaining] = useState(null);
+  const [timerIntervalId, setTimerIntervalId] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Refs
   const audioRef = useRef(new Audio());
 
-  // State management
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useLocalStorage("playerVolume", 1);
-  const [isMuted, setIsMuted] = useLocalStorage("playerMuted", false);
-  const [error, setError] = useState(null);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showQueue, setShowQueue] = useState(false);
-  const [timerAnchorEl, setTimerAnchorEl] = useState(null);
-  const [timerDuration, setTimerDuration] = useState(null);
-  const [timerRemaining, setTimerRemaining] = useState(null);
-  const [queuePosition, setQueuePosition] = useState(0);
-  const [playHistory, setPlayHistory] = useState([]);
-  const [playlistAnchor, setPlaylistAnchor] = useState(null);
-  const isLiked = currentTrack
-    ? likedSongs.some((song) => song.id === currentTrack.id)
-    : false;
+  // Context hooks
+  const { enqueueSnackbar } = useSnackbar();
+  const { addToRecentlyPlayed } = useLibrary();
+  const { downloadQuality } = useUserPreferences();
 
-  const [thumbnailUrl, setThumbnailUrl] = useState(null);
-
+  // Check if track is liked on mount and when track changes
   useEffect(() => {
-    if (currentTrack?.image) {
-      const highestQualityImage = currentTrack.image.reduce((prev, curr) => {
-        const prevQuality = parseInt(prev.quality.split('x')[0]);
-        const currQuality = parseInt(curr.quality.split('x')[0]);
-        return currQuality > prevQuality ? curr : prev;
-      }, currentTrack.image[0]);
-      setThumbnailUrl(highestQualityImage.url);
-    } else if (currentTrack?.metadata?.thumbnailUrl) {
-      setThumbnailUrl(currentTrack.metadata.thumbnailUrl);
+    if (currentTrack) {
+      const likedSongs = JSON.parse(localStorage.getItem('likedSongs') || '[]');
+      setIsLiked(likedSongs.some(song => song.id === currentTrack.id));
     }
   }, [currentTrack]);
 
-  useEffect(() => {
-    if (currentTrack?.isLocal && currentTrack?.thumbnailBlob) {
-      const blob = new Blob([currentTrack.thumbnailBlob], { type: 'image/jpeg' });
-      const url = URL.createObjectURL(blob);
-      setThumbnailUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-  }, [currentTrack]);
-
-  useEffect(() => {
+  const handleLikeClick = useCallback(() => {
     if (!currentTrack) return;
 
-    const audio = audioRef.current;
-    let playPromise;
+    const likedSongs = JSON.parse(localStorage.getItem('likedSongs') || '[]');
+    const trackIndex = likedSongs.findIndex(song => song.id === currentTrack.id);
 
-    const loadAndPlayTrack = async () => {
-      try {
-        // Determine audio URL with comprehensive validation
-        let audioUrl;
-        if (currentTrack.isLocal && currentTrack.audioUrl) {
-          const localValidation = await validateAudioSource(currentTrack.audioUrl);
-          if (localValidation.valid) {
-            audioUrl = currentTrack.audioUrl;
-          }
-        }
+    if (trackIndex === -1) {
+      // Add to liked songs
+      likedSongs.push({
+        id: currentTrack.id,
+        title: currentTrack.title || currentTrack.name,
+        artist: currentTrack.artist || currentTrack.primaryArtists,
+        image: currentTrack.image?.[0]?.link || currentTrack.coverUrl,
+        addedAt: new Date().toISOString()
+      });
+      setIsLiked(true);
+      enqueueSnackbar('Added to Liked Songs', { variant: 'success' });
+    } else {
+      // Remove from liked songs
+      likedSongs.splice(trackIndex, 1);
+      setIsLiked(false);
+      enqueueSnackbar('Removed from Liked Songs', { variant: 'info' });
+    }
 
-        // Fallback to download URLs
-        if (!audioUrl && currentTrack.downloadUrl) {
-          const downloadUrl = getUrlForQuality(currentTrack.downloadUrl, streamingQuality);
-          
-          if (downloadUrl) {
-            const urlValidation = await validateAudioSource(downloadUrl);
-            if (urlValidation.valid) {
-              audioUrl = downloadUrl;
-            }
-          }
-        }
+    localStorage.setItem('likedSongs', JSON.stringify(likedSongs));
+  }, [currentTrack, enqueueSnackbar]);
 
-        // Validate and set audio source
-        if (!audioUrl) {
-          throw new Error('No valid audio source found');
-        }
-
-        // Store current position before changing source
-        const currentPosition = audio.currentTime;
-
-        // Detect and set MIME type
-        const mimeType = detectMimeType(audioUrl);
-
-        // Reset and prepare audio
-        audio.pause();
-        audio.src = audioUrl;
-        audio.type = mimeType;
-        audio.load();
-
-        // Restore position after loading new source
-        audio.currentTime = currentPosition;
-
-        // Attempt playback if it was playing
-        if (isPlaying) {
-          playPromise = audio.play();
-          
-          if (playPromise !== undefined) {
-            await playPromise.catch(error => {
-              if (error.name === 'AbortError') return;
-              
-              console.error('Playback error:', error);
-              enqueueSnackbar(`Failed to play audio: ${error.message}`, { variant: 'error' });
-              setIsPlaying(false);
-              setError(error.message || 'Playback failed');
-            });
-          }
-        }
-
-        // Clear any previous errors
-        setError(null);
-
-      } catch (err) {
-        console.error('Track loading error:', err);
-        enqueueSnackbar(`Error loading track: ${err.message}`, { variant: 'error' });
-        setIsPlaying(false);
-        setError(err.message);
-      }
-    };
-
-    loadAndPlayTrack();
-
-    return () => {
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            if (audio) {
-              const currentPosition = audio.currentTime;
-              audio.pause();
-              audio.src = '';
-              audio.currentTime = currentPosition;
-            }
-          })
-          .catch(() => {
-            if (audio) {
-              audio.src = '';
-            }
-          });
-      } else if (audio) {
-        const currentPosition = audio.currentTime;
-        audio.pause();
-        audio.src = '';
-        audio.currentTime = currentPosition;
-      }
-    };
-  }, [currentTrack, streamingQuality, isPlaying, enqueueSnackbar]);
+  // Update play history when track changes
+  useEffect(() => {
+    if (currentTrack) {
+      setPlayHistory(prev => {
+        const newHistory = prev.filter(track => track.id !== currentTrack.id);
+        return [currentTrack, ...newHistory].slice(0, 50); // Keep last 50 tracks
+      });
+    }
+  }, [currentTrack]);
 
   const handlePlayPause = useCallback(async () => {
-    if (error) return;
+    if (playbackError) return;
 
     const audio = audioRef.current;
-    
+    if (!audio) return;
+
     try {
       if (isPlaying) {
-        const currentPosition = audio.currentTime;
-        await audio.pause();
-        audio.currentTime = currentPosition;
+        audio.pause();
+        setIsPlaying(false);
       } else {
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          await playPromise;
-        }
+        await audio.play();
+        setIsPlaying(true);
       }
-      setIsPlaying(!isPlaying);
+      setPlaybackError(null);
     } catch (error) {
-      if (error.name === 'AbortError') {
-        return;
-      }
-      console.error('Error playing audio:', error);
-      setError(error.message || 'Failed to play audio. Please try again.');
+      console.error('Playback error:', error);
+      setPlaybackError(error.message);
       setIsPlaying(false);
     }
-  }, [error, isPlaying]);
+  }, [isPlaying, playbackError]);
+
+  const loadAndPlayTrack = async () => {
+    if (!currentTrack) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      const audio = audioRef.current;
+
+      let audioUrl = null;
+      
+      if (currentTrack.isLocal && currentTrack.audioUrl) {
+        audioUrl = currentTrack.audioUrl;
+      } 
+      else if (currentTrack.downloadUrl && Array.isArray(currentTrack.downloadUrl)) {
+        const urls = currentTrack.downloadUrl
+          .filter(url => url && (url.link || url.url))
+          .map(url => url.link || url.url);
+        audioUrl = urls[0];
+      }
+      else if (currentTrack.downloadUrl && typeof currentTrack.downloadUrl === 'string') {
+        audioUrl = currentTrack.downloadUrl;
+      }
+      else if (currentTrack.url) {
+        audioUrl = currentTrack.url;
+      }
+      else if (currentTrack.media && currentTrack.media.url) {
+        audioUrl = currentTrack.media.url;
+      }
+
+      if (!audioUrl) {
+        throw new Error('No valid audio source found');
+      }
+
+      audio.src = audioUrl;
+      await audio.load();
+      audio.volume = isMuted ? 0 : volume;
+      
+      if (isPlaying) {
+        await audio.play();
+      }
+
+      setError(null);
+      
+      if (addToRecentlyPlayed && currentTrack) {
+        addToRecentlyPlayed(currentTrack);
+      }
+
+    } catch (err) {
+      console.error('Track loading error:', err);
+      setError(err.message || 'Failed to load track');
+      enqueueSnackbar(err.message || 'Failed to load track', { variant: 'error' });
+      setIsPlaying(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
@@ -495,31 +475,33 @@ const Player = ({
 
   const handleNext = useCallback(() => {
     if (onNext) {
-      setQueuePosition((prev) => prev + 1);
+      setPlayHistory(prev => {
+        const newHistory = prev.filter(track => track.id !== currentTrack.id);
+        return [currentTrack, ...newHistory].slice(0, 50); // Keep last 50 tracks
+      });
       onNext();
     }
   }, [onNext]);
 
   const handlePrevious = useCallback(() => {
-    if (currentTime > 3) {
-      // If current time > 3 seconds, restart the current track
+    if (audioRef.current.currentTime > 3) {
+      // If current time > 3 seconds, restart the song
       audioRef.current.currentTime = 0;
-    } else if (playHistory.length > 0) {
-      // Go to previous track in history
-      const previousTrack = playHistory[playHistory.length - 1];
-      setPlayHistory(prev => prev.slice(0, -1));
-      onQueueItemClick(previousTrack, queuePosition - 1);
-      setQueuePosition(prev => prev - 1);
-    } else if (hasPrevious) {
-      onPrevious();
+    } else if (playHistory.length > 1) {
+      // Play previous song from history
+      const previousTrack = playHistory[1]; // Current track is at index 0
+      onPrevious(previousTrack);
+    } else {
+      // Just restart the song if no history
+      audioRef.current.currentTime = 0;
     }
-  }, [currentTime, playHistory, hasPrevious, onPrevious, onQueueItemClick, queuePosition]);
+  }, [playHistory, onPrevious]);
 
   useEffect(() => {
     const audio = audioRef.current;
 
     const handleEnded = () => {
-      if (queuePosition < queue.length - 1) {
+      if (queue.length > 0) {
         handleNext();
       } else {
         setIsPlaying(false);
@@ -533,7 +515,7 @@ const Player = ({
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [handleTimeUpdate, handleNext, queue.length, queuePosition]);
+  }, [handleTimeUpdate, handleNext, queue.length]);
 
   const handleSliderChange = useCallback((_, newValue) => {
     const audio = audioRef.current;
@@ -556,9 +538,8 @@ const Player = ({
     }
   }, []);
 
-  const handleQueueClick = useCallback((e) => {
-    e?.stopPropagation();
-    setShowQueue(true);
+  const handleQueueClick = useCallback(() => {
+    setShowQueue(prev => !prev);
   }, []);
 
   const handleCloseQueue = useCallback(() => {
@@ -570,7 +551,10 @@ const Player = ({
   }, []);
 
   const handleQueueItemClick = useCallback((song, index) => {
-    setQueuePosition(index);
+    setPlayHistory(prev => {
+      const newHistory = prev.filter(track => track.id !== song.id);
+      return [song, ...newHistory].slice(0, 50); // Keep last 50 tracks
+    });
     onQueueItemClick(song, index);
     handleCloseQueue();
   }, [onQueueItemClick, handleCloseQueue]);
@@ -642,343 +626,247 @@ const Player = ({
     setTimerAnchorEl(null);
   };
 
-  const handleTimerSet = (minutes) => {
-    if (!minutes) {
-      setTimerDuration(null);
-      setTimerRemaining(null);
-    } else {
-      const endTime = Date.now() + minutes * 60 * 1000;
-      setTimerDuration(endTime);
-      setTimerRemaining(minutes * 60);
+  const handleTimerSet = (duration) => {
+    setTimerDuration(duration);
+    setTimerRemaining(duration * 60); // Convert minutes to seconds
+    handleTimerClose();
+
+    // Clear existing timer if any
+    if (timerIntervalId) {
+      clearInterval(timerIntervalId);
     }
+
+    // Start new timer
+    const intervalId = setInterval(() => {
+      setTimerRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(intervalId);
+          setTimerIntervalId(null);
+          setTimerDuration(null);
+          setIsPlaying(false);
+          audioRef.current.pause();
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    setTimerIntervalId(intervalId);
+  };
+
+  const handleTimerCancel = () => {
+    if (timerIntervalId) {
+      clearInterval(timerIntervalId);
+    }
+    setTimerDuration(null);
+    setTimerRemaining(null);
     handleTimerClose();
   };
 
+  // Cleanup timer on unmount
   useEffect(() => {
-    if (!timerDuration) {
-      setTimerRemaining(null);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const remaining = Math.max(0, Math.floor((timerDuration - now) / 1000));
-      
-      if (remaining <= 0) {
-        clearInterval(interval);
-        setTimerDuration(null);
-        setTimerRemaining(null);
-        if (audioRef.current && isPlaying) {
-          audioRef.current.pause();
-          setIsPlaying(false);
-        }
-      } else {
-        setTimerRemaining(remaining);
+    return () => {
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
       }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [timerDuration, isPlaying]);
-
-  const handleDownload = useCallback(async (track) => {
-    if (!track) return;
-    
-    try {
-      // Show starting download notification
-      enqueueSnackbar('Starting download...', { variant: 'info' });
-
-      // Get URL for selected quality
-      const selectedQualityUrl = getUrlForQuality(track.downloadUrl, downloadQuality);
-      
-      if (!selectedQualityUrl) {
-        enqueueSnackbar('No download URL available for selected quality', { variant: 'error' });
-        return;
-      }
-
-      // Fetch the audio file
-      const response = await fetch(selectedQualityUrl);
-      if (!response.ok) {
-        throw new Error('Failed to fetch audio file');
-      }
-      const arrayBuffer = await response.arrayBuffer();
-
-      // Clean text helper
-      const cleanText = (text) => {
-        return (text || '')
-          .replace(/[^\x20-\x7E]/g, '_')
-          .replace(/[\\/:"*?<>|]+/g, '_')
-          .slice(0, 30)
-          .trim();
-      };
-
-      // Prepare metadata
-      const metadata = {
-        title: cleanText(track.name || track.title || 'Unknown Title'),
-        artist: cleanText(track.primaryArtists || track.artists?.primary?.[0]?.name || 'Unknown Artist'),
-        album: cleanText(track.album?.name || ''),
-        year: (track.year || new Date().getFullYear()).toString().slice(0, 4),
-        comments: cleanText(downloadQuality)
-      };
-
-      // Create ID3v1 tag
-      const id3v1Buffer = createID3v1Buffer(metadata);
-      
-      if (!id3v1Buffer) {
-        throw new Error('Failed to create ID3 tags');
-      }
-
-      // Combine audio data with ID3v1 tag at the end
-      const finalBuffer = new Uint8Array(arrayBuffer.byteLength + id3v1Buffer.length);
-      finalBuffer.set(new Uint8Array(arrayBuffer), 0);
-      finalBuffer.set(id3v1Buffer, arrayBuffer.byteLength);
-
-      // Create blob with proper MIME type
-      const blob = new Blob([finalBuffer], { 
-        type: 'audio/mpeg; codecs="mp3"'
-      });
-
-      // Save to downloads storage
-      const downloadData = {
-        id: track.id,
-        title: metadata.title,
-        artist: metadata.artist,
-        album: metadata.album,
-        duration: track.duration,
-        downloadDate: new Date().toISOString(),
-        audioUrl: selectedQualityUrl,
-        coverUrl: track.image?.[2]?.link || track.image?.[0]?.link,
-      };
-
-      // Get existing downloads
-      const existingDownloads = JSON.parse(localStorage.getItem('downloads') || '[]');
-      
-      // Check if song already exists
-      const songExists = existingDownloads.some(song => song.id === track.id);
-      if (!songExists) {
-        existingDownloads.push(downloadData);
-        localStorage.setItem('downloads', JSON.stringify(existingDownloads));
-      }
-
-      // Generate safe filename
-      const filename = `${cleanText(metadata.title)}.mp3`;
-
-      // Create download link
-      const a = document.createElement('a');
-      const url = window.URL.createObjectURL(blob);
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      // Dispatch download complete event
-      window.dispatchEvent(new CustomEvent('downloadComplete', {
-        detail: { songId: track.id }
-      }));
-
-      enqueueSnackbar('Download completed successfully', { variant: 'success' });
-    } catch (error) {
-      console.error('Error downloading song:', error);
-      enqueueSnackbar('Failed to download song: ' + error.message, { variant: 'error' });
-    }
-  }, [downloadQuality, enqueueSnackbar]);
-
-  const getDisplayInfo = useCallback(() => {
-    if (!currentTrack) return null;
-
-    // For downloaded/offline tracks
-    if (currentTrack.isLocal) {
-      return {
-        title: currentTrack.title || currentTrack.name,
-        artist: currentTrack.artist || currentTrack.primaryArtists,
-        image: currentTrack.image?.[0]?.link || currentTrack.coverUrl,
-        isOffline: true
-      };
-    }
-
-    // For online tracks - get highest quality image available
-    const highQualityImage = currentTrack.image?.find(img => img.quality === '500x500')?.url ||
-                            currentTrack.image?.find(img => img.quality === '150x150')?.url ||
-                            currentTrack.image?.find(img => img.quality === '50x50')?.url;
-
-    return {
-      title: currentTrack.name || currentTrack.title,
-      artist: currentTrack.primaryArtists || currentTrack.artist || currentTrack.artists?.primary?.[0]?.name,
-      image: highQualityImage,
-      isOffline: false
     };
-  }, [currentTrack]);
+  }, [timerIntervalId]);
 
-  const displayInfo = getDisplayInfo();
-
-  // Early return if no track is playing
-  if (!currentTrack) {
-    return null;
-  }
-
-  const playerControls = useMemo(
-    () => (
-      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-          <IconButton
-            onClick={handlePrevious}
-            disabled={!hasPrevious}
-            sx={{ color: "white" }}
-          >
-            <SkipPrevious />
-          </IconButton>
-          <IconButton
-            onClick={handlePlayPause}
-            disabled={!currentTrack}
-            sx={{
-              color: "white",
-              bgcolor: "primary.main",
-              "&:hover": { bgcolor: "primary.dark" },
-            }}
-          >
-            {isPlaying ? <Pause /> : <PlayArrow />}
-          </IconButton>
-          <IconButton
-            onClick={handleNext}
-            disabled={!hasNext}
-            sx={{ color: "white" }}
-          >
-            <SkipNext />
-          </IconButton>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", width: "100%", gap: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 35 }}>
-            {formatTime(currentTime)}
-          </Typography>
-          <Slider
-            value={(currentTime / duration) * 100 || 0}
-            onChange={handleSliderChange}
-            onChangeCommitted={handleSliderChangeCommitted}
-            aria-label="Progress"
-            sx={{
-              color: "white",
-              height: 4,
-              '& .MuiSlider-thumb': {
-                width: 8,
-                height: 8,
-                transition: '0.3s cubic-bezier(.47,1.64,.41,.8)',
-                '&:before': {
-                  boxShadow: '0 2px 12px 0 rgba(0,0,0,0.4)',
-                },
-                '&:hover, &.Mui-focusVisible': {
-                  boxShadow: '0px 0px 0px 8px rgba(255, 255, 255, 0.16)',
-                },
-                '&.Mui-active': {
-                  width: 12,
-                  height: 12,
-                },
-              },
-              '& .MuiSlider-rail': {
-                opacity: 0.28,
-              },
-              '& .MuiSlider-track': {
-                transition: 'width 0.1s linear',
-              },
-            }}
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 35 }}>
-            {formatTime(duration)}
-          </Typography>
-        </Box>
-      </Box>
-    ),
-    [isPlaying, hasNext, hasPrevious, currentTime, duration, error]
-  );
-
-  const trackControls = useMemo(
-    () => (
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <IconButton onClick={handleTimerClick} sx={{ color: "white" }}>
-          <Badge
-            badgeContent={timerRemaining ? formatTimerDisplay(timerRemaining) : null}
-            color="primary"
-            sx={{
-              '& .MuiBadge-badge': {
-                fontSize: '0.75rem',
-                padding: '0 4px',
-                minWidth: '24px',
-                height: '20px',
-              }
-            }}
-          >
-            <Timer color={timerDuration ? "primary" : "inherit"} />
-          </Badge>
-        </IconButton>
-        <IconButton onClick={onLyricsClick} sx={{ color: "white" }}>
-          <Lyrics />
-        </IconButton>
-        <IconButton onClick={(e) => {
-          e.stopPropagation();
-          toggleLikeSong(currentTrack);
-        }} sx={{ color: isLiked ? "#1db954" : "white" }}>
-          {isLiked ? <Favorite /> : <FavoriteBorder />}
-        </IconButton>
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            setPlaylistAnchor(e.currentTarget);
-          }}
-          sx={{ color: "white" }}
-        >
-          <PlaylistAdd />
-        </IconButton>
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDownload(currentTrack).catch(error => {
-              console.error('Download failed:', error);
-            });
-          }}
-          sx={{ color: "white" }}
-        >
-          <Download />
-        </IconButton>
-      </Box>
-    ),
-    [timerDuration, timerRemaining, isLiked]
-  );
+  const formatTimerTime = (seconds) => {
+    if (!seconds) return "";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+    return `${hours > 0 ? hours + ":" : ""}${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
 
   const volumeControls = useMemo(
     () => (
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <IconButton onClick={handleToggleMute} size="small">
-          {isMuted || volume === 0 ? (
-            <VolumeOff sx={{ color: "white", fontSize: "1.5rem" }} />
+      <>
+        <IconButton
+          onClick={handleToggleMute}
+          sx={{ color: "white" }}
+        >
+          {isMuted ? (
+            <VolumeOff />
+          ) : volume === 0 ? (
+            <VolumeMute />
           ) : (
-            <VolumeUp sx={{ color: "white", fontSize: "1.5rem" }} />
+            <VolumeUp />
           )}
         </IconButton>
         <Slider
+          size="small"
           value={isMuted ? 0 : volume}
           onChange={handleVolumeChange}
           min={0}
           max={1}
           step={0.01}
+          aria-label="Volume"
           sx={{
             width: 100,
-            color: "white",
-            "& .MuiSlider-track": {
-              border: "none",
-            },
-            "& .MuiSlider-thumb": {
+            color: "#1db954",
+            '& .MuiSlider-thumb': {
               width: 12,
               height: 12,
-              backgroundColor: "#fff",
-              "&:hover, &.Mui-focusVisible": {
-                boxShadow: "0px 0px 0px 8px rgba(255, 255, 255, 0.16)",
+              '&:hover, &.Mui-focusVisible': {
+                boxShadow: '0px 0px 0px 8px rgba(29, 185, 84, 0.16)',
               },
             },
           }}
         />
+      </>
+    ),
+    [volume, isMuted, handleToggleMute, handleVolumeChange]
+  );
+
+  const playerControls = useMemo(
+    () => (
+      <Box
+        sx={{
+          width: { xs: "45%", sm: "40%" },
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 1
+        }}
+      >
+        {/* Playback Controls */}
+        <Box sx={{ 
+          display: "flex", 
+          alignItems: "center",
+          gap: { xs: 0.5, sm: 1 }
+        }}>
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevious();
+            }}
+            disabled={!hasPrevious}
+            sx={{ 
+              color: "white",
+              padding: { xs: "4px", sm: "8px" }
+            }}
+          >
+            <SkipPrevious sx={{ fontSize: { xs: "1.5rem", sm: "2rem" } }} />
+          </IconButton>
+
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePlayPause();
+            }}
+            sx={{ 
+              color: "white",
+              padding: { xs: "4px", sm: "8px" }
+            }}
+          >
+            {isPlaying ? (
+              <Pause sx={{ fontSize: { xs: "1.75rem", sm: "2.25rem" } }} />
+            ) : (
+              <PlayArrow sx={{ fontSize: { xs: "1.75rem", sm: "2.25rem" } }} />
+            )}
+          </IconButton>
+
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNext();
+            }}
+            disabled={!hasNext}
+            sx={{ 
+              color: "white",
+              padding: { xs: "4px", sm: "8px" }
+            }}
+          >
+            <SkipNext sx={{ fontSize: { xs: "1.5rem", sm: "2rem" } }} />
+          </IconButton>
+        </Box>
+
+        {/* Progress Bar */}
+        <Box sx={{ 
+          width: "100%", 
+          display: "flex", 
+          alignItems: "center",
+          gap: 1,
+          px: { xs: 1, sm: 2 }
+        }}>
+          <Typography variant="caption" color="text.secondary">
+            {formatTime(currentTime)}
+          </Typography>
+          <Slider
+            size="small"
+            value={((currentTime / duration) * 100) || 0}
+            onChange={handleSliderChange}
+            onChangeCommitted={handleSliderChangeCommitted}
+            sx={{
+              color: "#1db954",
+              height: 4,
+              "& .MuiSlider-thumb": {
+                width: 8,
+                height: 8,
+                "&:hover, &.Mui-focusVisible": {
+                  boxShadow: "0px 0px 0px 8px rgba(29, 185, 84, 0.16)",
+                },
+              },
+            }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {formatTime(duration)}
+          </Typography>
+        </Box>
       </Box>
     ),
-    [volume, isMuted]
+    [isPlaying, hasNext, hasPrevious, currentTime, duration, playbackError]
+  );
+
+  const trackControls = useMemo(
+    () => (
+      <Box
+        sx={{
+          width: { xs: "20%", sm: "30%" },
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: { xs: 0.5, sm: 1 }
+        }}
+      >
+        {/* Timer Button */}
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            handleTimerClick();
+          }}
+          sx={{ 
+            color: "white",
+            padding: { xs: "4px", sm: "8px" },
+            display: { xs: "none", sm: "flex" }
+          }}
+        >
+          <Timer sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
+        </IconButton>
+
+        {/* Volume Controls - Only show on larger screens */}
+        <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center" }}>
+          {volumeControls}
+        </Box>
+
+        {/* Queue Button */}
+        <IconButton 
+          sx={{ 
+            color: "white",
+            padding: { xs: "4px", sm: "8px" }
+          }} 
+          onClick={(e) => {
+            e.stopPropagation();
+            handleQueueClick(e);
+          }}
+        >
+          <QueueMusic sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
+        </IconButton>
+      </Box>
+    ),
+    [timerDuration, timerRemaining]
   );
 
   // Memoized Queue Item Component
@@ -1109,6 +997,187 @@ const Player = ({
     onQueueItemClick: PropTypes.func.isRequired,
   };
 
+  useEffect(() => {
+    if (currentTrack) {
+      loadAndPlayTrack();
+    }
+  }, [currentTrack]);
+
+  const getDisplayInfo = useCallback(() => {
+    if (!currentTrack) return null;
+
+    // For downloaded/offline tracks
+    if (currentTrack.isLocal) {
+      return {
+        title: currentTrack.title || currentTrack.name,
+        artist: currentTrack.artist || currentTrack.primaryArtists,
+        image: currentTrack.image?.[0]?.link || currentTrack.coverUrl,
+        isOffline: true
+      };
+    }
+
+    // For online tracks - get highest quality image available
+    const highQualityImage = currentTrack.image?.find(img => img.quality === '500x500')?.url ||
+                            currentTrack.image?.find(img => img.quality === '150x150')?.url ||
+                            currentTrack.image?.find(img => img.quality === '50x50')?.url;
+
+    return {
+      title: currentTrack.name || currentTrack.title,
+      artist: currentTrack.primaryArtists || currentTrack.artist || currentTrack.artists?.primary?.[0]?.name,
+      image: highQualityImage,
+      isOffline: false
+    };
+  }, [currentTrack]);
+
+  const displayInfo = getDisplayInfo();
+
+  // Early return if no track is playing
+  if (!currentTrack) {
+    return null;
+  }
+
+  const handlePlaylistMenuOpen = useCallback((event) => {
+    event.stopPropagation();
+    setSelectedTrack(currentTrack);
+    setPlaylistAnchorEl(event.currentTarget);
+  }, [currentTrack]);
+
+  const handlePlaylistMenuClose = useCallback(() => {
+    setPlaylistAnchorEl(null);
+    setSelectedTrack(null);
+  }, []);
+
+  const handleAddToPlaylist = useCallback((playlistId) => {
+    if (!selectedTrack) return;
+
+    try {
+      // Get existing playlists from localStorage
+      const playlists = JSON.parse(localStorage.getItem('playlists') || '[]');
+      const playlist = playlists.find(p => p.id === playlistId);
+
+      if (playlist) {
+        // Check if track already exists in playlist
+        if (!playlist.tracks.some(track => track.id === selectedTrack.id)) {
+          // Add track to playlist
+          playlist.tracks.push({
+            id: selectedTrack.id,
+            title: selectedTrack.title || selectedTrack.name,
+            artist: selectedTrack.artist || selectedTrack.primaryArtists,
+            image: selectedTrack.image?.[0]?.link || selectedTrack.coverUrl,
+            downloadUrl: selectedTrack.downloadUrl,
+            duration: selectedTrack.duration,
+            addedAt: new Date().toISOString()
+          });
+
+          // Save updated playlists
+          localStorage.setItem('playlists', JSON.stringify(playlists));
+          enqueueSnackbar(`Added to ${playlist.name}`, { variant: 'success' });
+        } else {
+          enqueueSnackbar('Track already in playlist', { variant: 'info' });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to add to playlist:', error);
+      enqueueSnackbar('Failed to add to playlist', { variant: 'error' });
+    }
+
+    handlePlaylistMenuClose();
+  }, [selectedTrack, enqueueSnackbar]);
+
+  const handleDownload = useCallback(async (track) => {
+    if (!track || isDownloading) return;
+    
+    try {
+      setIsDownloading(true);
+      enqueueSnackbar('Starting download...', { variant: 'info' });
+      
+      // Get download URL with comprehensive fallbacks
+      let downloadUrl;
+      
+      if (track.downloadUrl && Array.isArray(track.downloadUrl)) {
+        const urls = track.downloadUrl
+          .filter(url => url && (url.link || url.url))
+          .map(url => url.link || url.url);
+        downloadUrl = urls[0];
+      }
+      else if (track.downloadUrl && typeof track.downloadUrl === 'string') {
+        downloadUrl = track.downloadUrl;
+      }
+      else if (track.media && track.media.url) {
+        downloadUrl = track.media.url;
+      }
+      else if (track.url) {
+        downloadUrl = track.url;
+      }
+
+      if (!downloadUrl) {
+        throw new Error('No download URL available');
+      }
+
+      // Download the audio file
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download track: ${response.statusText}`);
+      }
+
+      // Get the audio blob
+      const audioBlob = await response.blob();
+      
+      // Save to IndexedDB
+      const songData = {
+        id: track.id,
+        title: track.title || track.name,
+        artist: track.artist || track.primaryArtists,
+        duration: track.duration,
+        downloadDate: new Date().toISOString(),
+        coverUrl: track.image?.[0]?.link || track.coverUrl
+      };
+
+      // Try to save to IndexedDB
+      try {
+        await audioStorage.saveSong(songData, audioBlob);
+      } catch (dbError) {
+        console.error('Failed to save to IndexedDB:', dbError);
+        // Continue with download even if IndexedDB fails
+      }
+
+      // Create download link for user
+      const url = window.URL.createObjectURL(audioBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${track.title || track.name || 'Unknown Track'}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      // Save metadata to localStorage for quick access
+      try {
+        const existingDownloads = JSON.parse(localStorage.getItem('downloads') || '[]');
+        if (!existingDownloads.some(song => song.id === track.id)) {
+          existingDownloads.push(songData);
+          localStorage.setItem('downloads', JSON.stringify(existingDownloads));
+        }
+      } catch (storageError) {
+        console.error('Failed to save to localStorage:', storageError);
+      }
+
+      // Notify success
+      enqueueSnackbar('Download complete!', { variant: 'success' });
+      
+      // Trigger download complete event
+      window.dispatchEvent(new CustomEvent('downloadComplete', {
+        detail: { songId: track.id }
+      }));
+
+    } catch (error) {
+      console.error('Download failed:', error);
+      enqueueSnackbar(`Download failed: ${error.message}`, { variant: 'error' });
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [enqueueSnackbar, isDownloading]);
+
   return (
     <>
       <Box
@@ -1120,8 +1189,8 @@ const Player = ({
         }}
         sx={{
           position: "fixed",
-          bottom: { xs: "56px", sm: 0 }, // Add space for bottom nav on mobile
-          left: 0,
+          bottom: { xs: "54px", sm: 0 }, // Add space for bottom nav on mobile
+          left: { xs: '0px', sm: '0px' }, // Shift left to accommodate sidebar
           right: 0,
           bgcolor: "#282828",
           p: { xs: 1, sm: 2 },
@@ -1136,143 +1205,256 @@ const Player = ({
           zIndex: 1200, // Ensure player stays above other content
         }}
       >
-        {/* Track Info */}
+        {/* Player Content */}
         <Box
           sx={{
-            width: { xs: "35%", sm: "30%" },
             display: "flex",
             alignItems: "center",
-            gap: 2,
-            overflow: "hidden"
+            height: "100%",
+            cursor: "pointer",
           }}
         >
-          {displayInfo?.image && (
-            <Box
-              component="img"
-              src={displayInfo.image}
-              alt={displayInfo.title}
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 1,
-                objectFit: "cover",
-                flexShrink: 0
-              }}
-            />
-          )}
-          <Box sx={{ 
-            minWidth: 0,
-            flex: 1
-          }}>
-            <Box sx={{
+          {/* Track Info */}
+          <Box
+            sx={{
+              width: { xs: "50%", sm: "5000%" },
               display: "flex",
               alignItems: "center",
-              gap: 1
-            }}>
-              <Typography
-                variant="subtitle1"
+              gap: 2,
+              overflow: "hidden"
+            }}
+          >
+            {displayInfo?.image && (
+              <Box
+                component="img"
+                src={displayInfo.image}
+                alt={displayInfo.title}
                 sx={{
-                  color: "white",
+                  width: 48,
+                  height: 48,
+                  borderRadius: 1,
+                  objectFit: "cover",
+                  flexShrink: 0
+                }}
+              />
+            )}
+            <Box sx={{ 
+              minWidth: 0,
+              flex: 1
+            }}>
+              <Box sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1
+              }}>
+                <Typography
+                  variant="subtitle1"
+                  sx={{
+                    color: "white",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }}
+                >
+                  {displayInfo?.title}
+                </Typography>
+                {displayInfo?.isOffline && (
+                  <Download
+                    sx={{
+                      fontSize: 16,
+                      color: "#1db954",
+                      flexShrink: 0
+                    }}
+                  />
+                )}
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "text.secondary",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap"
                 }}
               >
-                {displayInfo?.title}
+                {displayInfo?.artist}
               </Typography>
-              {displayInfo?.isOffline && (
-                <Download
-                  sx={{
-                    fontSize: 16,
-                    color: "#1db954",
-                    flexShrink: 0
-                  }}
-                />
-              )}
             </Box>
-            <Typography
-              variant="body2"
+          </Box>
+
+          {/* Player Controls */}
+          <Box
+            sx={{
+              width: { xs: "45%", sm: "40%" },
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 0
+            }}
+          >
+            {/* Playback Controls */}
+            <Box sx={{ 
+              display: "flex", 
+              alignItems: "center",
+              gap: { xs: 0.5, sm: 1 },
+              marginLeft: { xs: 0, sm: 0, md: '298%' },
+            }}>
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrevious();
+                }}
+                disabled={!hasPrevious}
+                sx={{ 
+                  color: "white",
+                  padding: { xs: "4px", sm: "8px" }
+                }}
+              >
+                <SkipPrevious sx={{ fontSize: { xs: "1.5rem", sm: "2rem" } }} />
+              </IconButton>
+
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePlayPause();
+                }}
+                sx={{ 
+                  color: "white",
+                  padding: { xs: "4px", sm: "8px" }
+                }}
+              >
+                {isPlaying ? (
+                  <Pause sx={{ fontSize: { xs: "1.75rem", sm: "2.25rem" } }} />
+                ) : (
+                  <PlayArrow sx={{ fontSize: { xs: "1.75rem", sm: "2.25rem" } }} />
+                )}
+              </IconButton>
+
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNext();
+                }}
+                disabled={!hasNext}
+                sx={{ 
+                  color: "white",
+                  padding: { xs: "4px", sm: "8px" }
+                }}
+              >
+                <SkipNext sx={{ fontSize: { xs: "1.5rem", sm: "2rem" } }} />
+              </IconButton>
+            </Box>
+
+            {/* Progress Bar */}
+            <Box sx={{ 
+              width: { xs: "150px", sm: "300%" }, 
+              display: "flex", 
+              alignItems: "center",
+              justifyContent: "center",
+              gap: { xs: 1, sm: 3 },
+              px: { xs: 1, sm: 2 },
+              marginLeft: { xs: 0, sm: 0, md: '298%' },
+                
+            }}>
+              <Typography variant="caption" color="text.secondary">
+                {formatTime(currentTime)}
+              </Typography>
+              <Slider
+                size="small"
+                value={((currentTime / duration) * 100) || 0}
+                onChange={handleSliderChange}
+                onChangeCommitted={handleSliderChangeCommitted}
+                sx={{
+                  color: "#1db954",
+                  height: 4,
+                  "& .MuiSlider-thumb": {
+                    width: 8,
+                    height: 8,
+                    "&:hover, &.Mui-focusVisible": {
+                      boxShadow: "0px 0px 0px 8px rgba(29, 185, 84, 0.16)",
+                    },
+                  },
+                }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                {formatTime(duration)}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Additional Controls */}
+          <Box
+            sx={{
+              width: { xs: "20%", sm: "30%" },
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: { xs: 0.5, sm: 1 },
+              
+            }}
+          >
+            
+
+            {/* Volume Controls - Only show on larger screens */}
+            <Box
               sx={{
-                color: "text.secondary",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap"
+                display: { xs: "none", sm: "flex" },
+                alignItems: "center",
+                position: "absolute",
+                right: 40,
+                top: "50%",
+                transform: "translateY(-20%)",
               }}
             >
-              {displayInfo?.artist}
-            </Typography>
+              {volumeControls}
+            </Box>
+
+            {/* Queue Button */}
+            <IconButton 
+              sx={{ 
+                color: "white",
+                padding: { xs: "4px", sm: "8px" },
+                alignItems: "center",
+                position: "absolute",
+                right: { xs: "3px", sm: 200 },
+                top: "50%",
+                transform: "translateY(-20%)",
+                
+              }} 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQueueClick(e);
+              }}
+            >
+              <QueueMusic sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
+            </IconButton>
           </Box>
         </Box>
-
-        {/* Player Controls */}
-        <Box
-          sx={{
-            width: { xs: "45%", sm: "40%" },
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          {playerControls}
-        </Box>
-
-        {/* Volume and Queue Controls */}
-        <Box
-          sx={{
-            width: { xs: "20%", sm: "30%" },
-            display: "flex",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            gap: { xs: 0.5, sm: 1 },
-          }}
-        >
-          {/* Only show volume controls on larger screens */}
-          <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center" }}>
-            {volumeControls}
-          </Box>
-          {/* Show queue button on all screens */}
-          <IconButton 
-            sx={{ 
-              color: "white",
-              padding: { xs: "4px", sm: "8px" }
-            }} 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleQueueClick(e);
-            }}
-          >
-            <QueueMusic sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
-          </IconButton>
-        </Box>
-
-        {/* Error Message */}
-        {error && (
-          <Typography
-            sx={{
-              position: "absolute",
-              top: -30,
-              left: "50%",
-              transform: "translateX(-50%)",
-              color: "error.main",
-              bgcolor: "background.paper",
-              px: 2,
-              py: 1,
-              borderRadius: 1,
-              fontSize: { xs: "0.75rem", sm: "0.875rem" },
-              whiteSpace: "nowrap"
-            }}
-          >
-            {error}
-          </Typography>
-        )}
       </Box>
 
       <QueueDrawer
         open={showQueue}
-        onClose={handleCloseQueue}
+        onClose={() => setShowQueue(false)}
         queue={queue}
-        onQueueItemClick={handleQueueItemClick}
+        onQueueItemClick={onQueueItemClick}
       />
+      <Menu
+        anchorEl={playlistAnchorEl}
+        open={Boolean(playlistAnchorEl)}
+        onClose={handlePlaylistMenuClose}
+      >
+        {JSON.parse(localStorage.getItem('playlists') || '[]').map((playlist) => (
+          <MenuItem 
+            key={playlist.id}
+            onClick={() => handleAddToPlaylist(playlist.id)}
+          >
+            {playlist.name}
+          </MenuItem>
+        ))}
+        {JSON.parse(localStorage.getItem('playlists') || '[]').length === 0 && (
+          <MenuItem disabled>No playlists available</MenuItem>
+        )}
+      </Menu>
       <ExpandedPlayer
         open={isExpanded}
         onClose={handleExpandedClose}
@@ -1301,11 +1483,6 @@ const Player = ({
       >
         {playerControls}
       </ExpandedPlayer>
-      <PlaylistMenu
-        anchorEl={playlistAnchor}
-        onClose={() => setPlaylistAnchor(null)}
-        song={currentTrack}
-      />
     </>
   );
 };

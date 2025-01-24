@@ -73,6 +73,11 @@ export const DownloadsAudioProvider = ({ children }) => {
 
       const audio = audioRef.current;
 
+      // Clean up previous object URL if exists
+      if (currentTrack?._cleanup) {
+        currentTrack._cleanup();
+      }
+
       if (currentTrack?.id === track.id) {
         if (isPlaying) {
           audio.pause();
@@ -89,15 +94,34 @@ export const DownloadsAudioProvider = ({ children }) => {
       setQueue(playlist.filter(item => item.id !== track.id));
 
       // Load and play new track
-      audio.src = track.audioUrl;
-      audio.load();
-      await audio.play();
-      setIsPlaying(true);
+      if (track.audioUrl) {
+        audio.src = track.audioUrl;
+        audio.load();
+        try {
+          await audio.play();
+          setIsPlaying(true);
+        } catch (error) {
+          console.error('Playback error:', error);
+          setIsPlaying(false);
+          throw new Error('Failed to play audio');
+        }
+      } else {
+        throw new Error('No audio URL available');
+      }
     } catch (error) {
       console.error('Play error:', error);
       setIsPlaying(false);
     }
   };
+
+  // Clean up object URLs when component unmounts or track changes
+  useEffect(() => {
+    return () => {
+      if (currentTrack?._cleanup) {
+        currentTrack._cleanup();
+      }
+    };
+  }, [currentTrack]);
 
   const handlePause = () => {
     const audio = audioRef.current;

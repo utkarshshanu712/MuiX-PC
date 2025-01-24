@@ -27,6 +27,7 @@ import {
 import { useDownloadsAudio } from '../contexts/DownloadsAudioContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import DownloadsPlayer from '../components/DownloadsPlayer';
+import { audioStorage } from '../services/AudioStorage';
 
 const Downloads = () => {
   const theme = useTheme();
@@ -54,52 +55,80 @@ const Downloads = () => {
     setTotalDuration(total);
   }, [downloads]);
 
-  const loadDownloadedSongs = () => {
+  const loadDownloadedSongs = async () => {
     try {
+      // Get metadata from localStorage
       const storedDownloads = JSON.parse(localStorage.getItem('downloads') || '[]');
-      setDownloads(storedDownloads);
+      
+      // Verify and clean up storage
+      const verifiedDownloads = [];
+      const cleanupPromises = [];
+      
+      for (const song of storedDownloads) {
+        try {
+          const storedSong = await audioStorage.getSong(song.id);
+          if (storedSong && storedSong.audioBlob) {
+            verifiedDownloads.push({
+              ...song,
+              isOffline: true,
+              audioBlob: storedSong.audioBlob
+            });
+          } else {
+            // If song not in IndexedDB, mark for cleanup from localStorage
+            cleanupPromises.push(song.id);
+          }
+        } catch (error) {
+          console.warn(`Song ${song.id} not found in IndexedDB, removing from localStorage`);
+          cleanupPromises.push(song.id);
+        }
+      }
+      
+      // Clean up localStorage if needed
+      if (cleanupPromises.length > 0) {
+        const cleanedDownloads = storedDownloads.filter(
+          song => !cleanupPromises.includes(song.id)
+        );
+        localStorage.setItem('downloads', JSON.stringify(cleanedDownloads));
+        
+        if (cleanedDownloads.length !== storedDownloads.length) {
+          enqueueSnackbar('Some downloaded songs were not found and have been cleaned up', 
+            { variant: 'warning' });
+        }
+      }
+      
+      setDownloads(verifiedDownloads);
     } catch (error) {
       console.error('Failed to load downloads:', error);
       enqueueSnackbar('Failed to load downloads', { variant: 'error' });
     }
   };
 
-  const handlePlaySong = (song) => {
-    const offlineTrack = {
-      id: song.id,
-      name: song.title || song.name,
-      title: song.title || song.name,
-      primaryArtists: song.artist,
-      artist: song.artist,
-      image: [{ link: song.coverUrl }],
-      downloadUrl: null,
-      isLocal: true,
-      audioUrl: song.audioUrl,
-      duration: song.duration,
-      type: 'song',
-      playCount: 0,
-      language: song.language || 'unknown'
-    };
-    
-    const playlist = downloads
-      .filter(d => d.id !== song.id)
-      .map(d => ({
-        id: d.id,
-        name: d.title || d.name,
-        title: d.title || d.name,
-        primaryArtists: d.artist,
-        artist: d.artist,
-        image: [{ link: d.coverUrl }],
-        downloadUrl: null,
+  const handlePlaySong = async (song) => {
+    try {
+      if (!song.audioBlob) {
+        // Try to get the audio blob from IndexedDB if not already loaded
+        const storedSong = await audioStorage.getSong(song.id);
+        if (!storedSong || !storedSong.audioBlob) {
+          throw new Error('Song data not found');
+        }
+        song.audioBlob = storedSong.audioBlob;
+      }
+
+      // Create an object URL for the audio blob
+      const objectUrl = URL.createObjectURL(song.audioBlob);
+
+      const offlineTrack = {
+        ...song,
         isLocal: true,
-        audioUrl: d.audioUrl,
-        duration: d.duration,
-        type: 'song',
-        playCount: 0,
-        language: d.language || 'unknown'
-      }));
-    
-    handlePlay(offlineTrack, playlist);
+        audioUrl: objectUrl,
+        downloadUrl: null,
+      };
+
+      handlePlay(offlineTrack);
+    } catch (error) {
+      console.error('Failed to play song:', error);
+      enqueueSnackbar('Failed to play song: ' + error.message, { variant: 'error' });
+    }
   };
 
   const handlePlayAll = (shuffle = false) => {
@@ -132,11 +161,16 @@ const Downloads = () => {
     handlePlay(firstTrack, remainingTracks);
   };
 
-  const handleDelete = (songId) => {
+  const handleDelete = async (songId) => {
     try {
+      // Delete from IndexedDB
+      await audioStorage.deleteSong(songId);
+      
+      // Update localStorage
       const updatedDownloads = downloads.filter(song => song.id !== songId);
       localStorage.setItem('downloads', JSON.stringify(updatedDownloads));
       setDownloads(updatedDownloads);
+      
       enqueueSnackbar('Song deleted from downloads', { variant: 'success' });
     } catch (error) {
       console.error('Failed to delete song:', error);
