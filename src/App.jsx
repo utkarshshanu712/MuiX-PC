@@ -30,6 +30,7 @@ import { DownloadsAudioProvider, useDownloadsAudio } from './contexts/DownloadsA
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
+import ErrorBoundary from './components/ErrorBoundary';
 
 const darkTheme = createTheme({
   palette: {
@@ -247,7 +248,9 @@ function AppContent() {
     }
   }, [queue.length]);
 
-  const handleSongSelect = useCallback(async (song, queueSongs = []) => {
+  const handleSongSelect = useCallback(async (song, songs = []) => {
+    if (!song) return;
+    
     // Don't play music on For You page
     if (isForYouPage) return;
 
@@ -265,8 +268,8 @@ function AppContent() {
     setCurrentTrack(song);
 
     // Handle queue management
-    if (queueSongs.length > 0) {
-      const newQueue = queueSongs.filter(s => s.id !== song.id);
+    if (songs.length > 0) {
+      const newQueue = songs.filter(s => s.id !== song.id);
       setQueue(newQueue);
     } else {
       setQueue([]);
@@ -287,24 +290,17 @@ function AppContent() {
     } catch (error) {
       console.error('Error fetching lyrics:', error);
     }
-  }, [currentTrack, isForYouPage]);
 
-  const handleQueueItemClick = useCallback((song, index) => {
-    if (!song) return;
-    
-    // Remove clicked song and all songs before it from queue
-    const newQueue = queue.slice(index + 1);
-    setQueue(newQueue);
-    
-    // Set the clicked song as current track
-    setCurrentTrack(song);
-    
-    // Add to play history
-    setPlayHistory(prev => {
-      const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 50);
-      return newHistory;
-    });
-  }, [queue]);
+    return Promise.resolve(); // Ensure we return a Promise
+  }, [currentTrack, isForYouPage, fetchLyrics]);
+
+  const handleQueueItemClick = useCallback((songs) => {
+    if (Array.isArray(songs)) {
+      setQueue(prevQueue => [...prevQueue, ...songs]);
+    } else {
+      setQueue(prevQueue => [...prevQueue, songs]);
+    }
+  }, []);
 
   const handleNext = useCallback(() => {
     if (queue.length === 0) return;
@@ -394,16 +390,20 @@ function AppContent() {
 
           {/* Audio Players */}
           {!isDownloadsActive && !isForYouPage && (
-            <Player
-              currentTrack={currentTrack}
-              onNext={handleNext}
-              onPrevious={handlePrevious}
-              hasNext={queue.length > 0}
-              hasPrevious={playHistory.length > 0}
-              queue={queue}
-              onQueueItemClick={handleQueueItemClick}
-              onReorderQueue={handleReorderQueue}
-            />
+            <Box sx={{ pb: 7 }}>
+              <ErrorBoundary>
+                <Player
+                  currentTrack={currentTrack}
+                  onNext={handleNext}
+                  onPrevious={handlePrevious}
+                  hasNext={queue.length > 0}
+                  hasPrevious={playHistory.length > 0}
+                  queue={queue}
+                  onQueueItemClick={handleQueueItemClick}
+                  onReorderQueue={handleReorderQueue}
+                />
+              </ErrorBoundary>
+            </Box>
           )}
         </>
       )}

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useRef, useState, useEffect, useCallb
 import { useSettings } from './SettingsContext';
 import { useSnackbar } from './SnackbarContext';
 
-const AudioContext = createContext();
+export const AudioContext = createContext();
 
 // Advanced audio source validation
 const validateAudioSource = async (url, timeout = 5000) => {

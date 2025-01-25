@@ -2,34 +2,39 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
   Typography,
-  IconButton,
-  Card,
-  CardContent,
-  CardMedia,
   Grid,
+  Button,
+  IconButton,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
+  Container,
+  Stack,
+  Avatar,
   List,
   ListItem,
-  ListItemAvatar,
   ListItemText,
-  Avatar,
-  Button,
+  ListItemAvatar,
+  Divider,
   InputBase,
   Paper,
   Snackbar,
-  Chip
+  Chip,
+  Card,
+  CardContent,
+  CardMedia,
+  Dialog,
+  DialogTitle,
+  DialogContent
 } from "@mui/material";
 import { 
-  ChevronLeft, 
-  ChevronRight, 
   Close as CloseIcon, 
   PlayArrow as PlayArrowIcon,
   Shuffle as ShuffleIcon,
   Search as SearchIcon,
-  Verified as VerifiedIcon
+  Verified as VerifiedIcon,
+  NavigateBefore,
+  NavigateNext,
+  KeyboardArrowLeft as ChevronLeft,
+  KeyboardArrowRight as ChevronRight
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -101,6 +106,32 @@ const topCharts = [
   },
 ];
 
+const getArtistNames = (song) => {
+  if (!song || !song.artists) return 'Unknown Artist';
+  
+  // First try to get primary artists
+  if (song.artists.primary && song.artists.primary.length > 0) {
+    return song.artists.primary.map(artist => artist.name).join(', ');
+  }
+  
+  // If no primary artists, get all artists with role "singer" or "primary_artists"
+  if (song.artists.all && song.artists.all.length > 0) {
+    const singers = song.artists.all.filter(
+      artist => artist.role === 'singer' || artist.role === 'primary_artists'
+    );
+    if (singers.length > 0) {
+      return singers.map(artist => artist.name).join(', ');
+    }
+  }
+  
+  // Fallback to first artist in the all array if exists
+  if (song.artists.all && song.artists.all.length > 0) {
+    return song.artists.all[0].name;
+  }
+  
+  return 'Unknown Artist';
+};
+
 const SongCard = ({ song, onSongSelect }) => (
   <Card
     onClick={() => onSongSelect(song)}
@@ -128,7 +159,7 @@ const SongCard = ({ song, onSongSelect }) => (
         {song.name}
       </Typography>
       <Typography variant="body2" color="text.secondary" noWrap>
-        {song.primaryArtists}
+        {getArtistNames(song)}
       </Typography>
     </CardContent>
   </Card>
@@ -414,7 +445,7 @@ const ChartCard = ({ title, chart, onSongSelect }) => {
                 </ListItemAvatar>
                 <ListItemText
                   primary={song.name}
-                  secondary={song.primaryArtists}
+                  secondary={getArtistNames(song)}
                   sx={{ color: "white" }}
                 />
               </ListItem>
@@ -637,7 +668,7 @@ const SwipeableSection = ({ title, songs, onSongSelect, onLoadMore, hasMore }) =
                   mt: 0.5
                 }}
               >
-                {song.primaryArtists}
+                {getArtistNames(song)}
               </Typography>
             </Box>
           </Box>
@@ -761,7 +792,7 @@ const AlbumCard = ({ album, onAlbumSelect }) => {
             whiteSpace: 'nowrap'
           }}
         >
-          {album.primaryArtists || 'Various Artists'}
+          {getArtistNames(album)}
         </Typography>
       </Box>
     </Box>
@@ -1083,6 +1114,453 @@ const TopArtistsSection = () => {
   );
 };
 
+const QuickPicks = ({ onSongSelect }) => {
+  const [quickPicks, setQuickPicks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { recentlyPlayed } = useUserPreferences();
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+  const itemsPerPage = { xs: 6, sm: 6, md: 8 };
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 600);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const currentItemsPerPage = isMobile ? itemsPerPage.xs : itemsPerPage.md;
+
+  useEffect(() => {
+    const fetchQuickPicks = async () => {
+      try {
+        setIsLoading(true);
+        const recommendations = [];
+        
+        const queries = recentlyPlayed?.length 
+          ? recentlyPlayed.slice(0, 3).map(song => song.primaryArtists || song.name)
+          : ['latest hits', 'trending songs', 'popular'];
+
+        for (const query of queries) {
+          try {
+            const response = await axios.get(
+              `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}&limit=10`
+            );
+            if (response.data?.data?.results) {
+              recommendations.push(...response.data.data.results);
+            }
+          } catch (error) {
+            console.error('Error fetching recommendations:', error);
+          }
+        }
+
+        const processedSongs = recommendations
+          .filter(Boolean)
+          .filter((song, index, self) => 
+            index === self.findIndex(s => s.id === song.id) &&
+            (!recentlyPlayed?.length || !recentlyPlayed.some(played => played.id === song.id))
+          )
+          .slice(0, 24);
+
+        if (processedSongs.length < 20) {
+          try {
+            const trendingResponse = await axios.get(
+              'https://saavn.dev/api/search/songs?query=top hits&limit=20'
+            );
+            if (trendingResponse.data?.data?.results) {
+              const additionalSongs = trendingResponse.data.data.results
+                .filter(song => !processedSongs.some(s => s.id === song.id));
+              processedSongs.push(...additionalSongs);
+            }
+          } catch (error) {
+            console.error('Error fetching trending songs:', error);
+          }
+        }
+
+        setQuickPicks(processedSongs.slice(0, 24));
+      } catch (error) {
+        console.error('Error fetching quick picks:', error);
+        setQuickPicks([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (quickPicks.length === 0) {
+      fetchQuickPicks();
+    }
+  }, [recentlyPlayed]);
+
+  const handlePlayAll = () => {
+    if (quickPicks.length > 0) {
+      const startSong = quickPicks[0];
+      onSongSelect(startSong, quickPicks.slice(1));
+    }
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(0, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    const maxPages = Math.ceil(quickPicks.length / currentItemsPerPage);
+    setCurrentPage(prev => Math.min(maxPages - 1, prev + 1));
+  };
+
+  const visiblePicks = quickPicks.slice(
+    currentPage * currentItemsPerPage,
+    (currentPage + 1) * currentItemsPerPage
+  );
+
+  const handleSongClick = (song, index) => {
+    const remainingSongs = [
+      ...quickPicks.slice(index + 1),
+      ...quickPicks.slice(0, index)
+    ];
+    onSongSelect(song, remainingSongs);
+  };
+
+  return (
+    <Box sx={{ width: '100%', mb: 4, bgcolor: '#121212' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        mb: 2,
+        px: { xs: 1, sm: 2 },
+        py: 1
+      }}>
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            fontWeight: 'bold', 
+            color: '#fff',
+            fontSize: { xs: '1.1rem', sm: '1.25rem' }
+          }}
+        >
+          Quick Picks
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Button
+            onClick={handlePlayAll}
+            disabled={quickPicks.length === 0}
+            sx={{
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              color: '#fff',
+              fontSize: '0.875rem',
+              textTransform: 'none',
+              px: 2,
+              py: 0.5,
+              minWidth: 'auto',
+              borderRadius: 1,
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.2)',
+              },
+              '&.Mui-disabled': {
+                color: 'rgba(255, 255, 255, 0.3)',
+                bgcolor: 'rgba(255, 255, 255, 0.05)'
+              }
+            }}
+          >
+            Play all
+          </Button>
+          <IconButton 
+            onClick={handlePrevPage}
+            disabled={currentPage === 0}
+            sx={{ 
+              color: '#fff',
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' },
+              p: 0.5,
+              ml: 1,
+              '&.Mui-disabled': {
+                color: 'rgba(255, 255, 255, 0.3)',
+                bgcolor: 'rgba(255, 255, 255, 0.05)'
+              }
+            }}
+          >
+            <ChevronLeft />
+          </IconButton>
+          <IconButton 
+            onClick={handleNextPage}
+            disabled={currentPage >= Math.ceil(quickPicks.length / currentItemsPerPage) - 1}
+            sx={{ 
+              color: '#fff',
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' },
+              p: 0.5,
+              '&.Mui-disabled': {
+                color: 'rgba(255, 255, 255, 0.3)',
+                bgcolor: 'rgba(255, 255, 255, 0.05)'
+              }
+            }}
+          >
+            <ChevronRight />
+          </IconButton>
+        </Box>
+      </Box>
+
+      <Grid 
+        container 
+        spacing={1.5}
+        sx={{ 
+          px: { xs: 1, sm: 2 },
+          '& .MuiGrid-item': {
+            maxWidth: { xs: '50%', sm: '50%', md: '25%' },
+            flexBasis: { xs: '50%', sm: '50%', md: '25%' }
+          }
+        }}
+      >
+        {isLoading ? (
+          Array(isMobile ? 6 : 8).fill(0).map((_, index) => (
+            <Grid item xs={6} sm={6} md={3} key={index}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: { xs: 1, sm: 1.5 },
+                  bgcolor: 'rgba(32, 32, 32, 0.9)',
+                  borderRadius: 1,
+                  p: { xs: 0.75, sm: 1 },
+                  height: { xs: '60px', sm: '72px' }
+                }}
+              >
+                <Box
+                  sx={{
+                    width: { xs: '40px', sm: '56px' },
+                    height: { xs: '40px', sm: '56px' },
+                    borderRadius: 1,
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <CircularProgress size={20} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ height: 10, width: '70%', bgcolor: 'rgba(255, 255, 255, 0.1)', borderRadius: 1, mb: 1 }} />
+                  <Box sx={{ height: 8, width: '50%', bgcolor: 'rgba(255, 255, 255, 0.1)', borderRadius: 1 }} />
+                </Box>
+              </Box>
+            </Grid>
+          ))
+        ) : quickPicks.length === 0 ? (
+          <Grid item xs={12}>
+            <Box sx={{ 
+              textAlign: 'center', 
+              py: 4,
+              color: 'rgba(255, 255, 255, 0.7)'
+            }}>
+              <Typography>Loading recommendations...</Typography>
+            </Box>
+          </Grid>
+        ) : (
+          visiblePicks.slice(0, isMobile ? 6 : 8).map((song, index) => (
+            <Grid item xs={6} sm={6} md={3} key={song.id || index}>
+              <Box
+                onClick={() => handleSongClick(song, currentPage * currentItemsPerPage + index)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: { xs: 1, sm: 2 },
+                  bgcolor: 'rgba(32, 32, 32, 0.9)',
+                  borderRadius: 1,
+                  p: { xs: 0.75, sm: 1.5 },
+                  height: { xs: '60px', sm: '80px' },
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  '&:hover': {
+                    bgcolor: 'rgba(48, 48, 48, 0.9)',
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    width: { xs: '40px', sm: '64px' },
+                    height: { xs: '40px', sm: '64px' },
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    bgcolor: 'rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <img
+                    src={song.image?.[2]?.url || song.image?.[1]?.url || song.image?.[0]?.url || song.image}
+                    alt={song.name}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block'
+                    }}
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/64?text=Music';
+                    }}
+                  />
+                </Box>
+                <Box sx={{ 
+                  overflow: 'hidden',
+                  flex: 1,
+                  minWidth: 0
+                }}>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      color: '#fff',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.7rem', sm: '0.95rem' },
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      mb: { xs: 0.25, sm: 0.75 }
+                    }}
+                  >
+                    {(song.name || 'Untitled').length > 15 && isMobile
+                      ? `${song.name.substring(0, 15)}...` 
+                      : (song.name || 'Untitled')}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: { xs: '0.6rem', sm: '0.85rem' },
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {getArtistNames(song)}
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+          ))
+        )}
+      </Grid>
+    </Box>
+  );
+};
+
+const CategorySection = ({ category, songs, onLoadMore, onSongSelect, isLoading }) => {
+  return (
+    <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+      <Typography variant="h6" sx={{ fontSize: { xs: '2rem', sm: '2.25rem' }, fontWeight: 600, mb: { xs: 2, sm: 2.5 }, color: '#4DC1CC' }}>
+        {category.title}
+      </Typography>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 2, maxWidth: '100%' }}>
+        {songs.map((song, index) => (
+          <Box key={song.id || index} sx={{ width: '100%' }}>
+            <Box
+              onClick={() => onSongSelect(song, index)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                p: 1.5,
+                bgcolor: 'rgba(255,255,255,0.05)',
+                borderRadius: 1,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,0.1)',
+                },
+                scrollSnapAlign: 'start',
+                minWidth: { xs: '100px', sm: '150px' }
+              }}
+            >
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  bgcolor: 'rgba(0,0,0,0.2)',
+                  position: 'relative'
+                }}
+              >
+                <img
+                  src={
+                    Array.isArray(song.image) && song.image.length > 0
+                      ? song.image[song.image.length - 1].url // Get highest quality image (last in array)
+                      : song.image?.url || song.downloadUrl?.[song.downloadUrl.length - 1]?.url || 'https://via.placeholder.com/48?text=Music'
+                  }
+                  alt={song.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block'
+                  }}
+                  onError={(e) => {
+                    console.log('Image load error for:', song.name);
+                    e.target.src = 'https://via.placeholder.com/48?text=Music';
+                  }}
+                  loading="lazy"
+                />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    color: '#fff',
+                    fontWeight: 500,
+                    fontSize: { xs: '0.875rem', sm: '1rem' },
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    mb: 0.5
+                  }}
+                >
+                  {song.name || 'Untitled'}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {getArtistNames(song)}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        ))}
+      </Box>
+      
+      {isLoading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <CircularProgress size={24} sx={{ color: '#fff' }} />
+        </Box>
+      )}
+      
+      {!isLoading && songs.length >= 20 && (
+        <Button
+          onClick={onLoadMore}
+          sx={{
+            mt: 2,
+            color: '#fff',
+            bgcolor: 'rgba(255,255,255,0.1)',
+            '&:hover': {
+              bgcolor: 'rgba(255,255,255,0.2)'
+            }
+          }}
+        >
+          Load More
+        </Button>
+      )}
+    </Box>
+  );
+};
+
 const Home = ({ onSongSelect, username }) => {
   const { topPlaylists, isLoading } = useTopPlaylists();
   const { recentlyPlayed } = useUserPreferences();
@@ -1140,7 +1618,6 @@ const Home = ({ onSongSelect, username }) => {
     try {
       let response;
       if (category.type === 'album') {
-        // For movie albums
         response = await axios.get(
           `https://saavn.dev/api/search/albums?query=${encodeURIComponent(
             category.query
@@ -1157,7 +1634,6 @@ const Home = ({ onSongSelect, username }) => {
           [category.id]: page === 1 ? movieAlbums : [...(prev[category.id] || []), ...movieAlbums],
         }));
       } else {
-        // For regular playlists
         response = await axios.get(
           `https://saavn.dev/api/search/playlists?query=${encodeURIComponent(
             category.query
@@ -1192,7 +1668,6 @@ const Home = ({ onSongSelect, username }) => {
     }
   };
 
-  // Load initial data
   useEffect(() => {
     categories.forEach((category) => {
       loadSongsForCategory(category);
@@ -1201,9 +1676,8 @@ const Home = ({ onSongSelect, username }) => {
     albumCategories.forEach((category) => {
       loadAlbumsForCategory(category);
     });
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
-  // Refresh albums every hour
   useEffect(() => {
     const refreshAlbums = () => {
       albumCategories.forEach((category) => {
@@ -1806,7 +2280,6 @@ const Home = ({ onSongSelect, username }) => {
 
   ];
 
-  // Function to generate a random vibrant color
   const generateVibrantColor = () => {
     const colors = [
       'rgba(156, 39, 176, 0.9)',   // Purple
@@ -1815,7 +2288,7 @@ const Home = ({ onSongSelect, username }) => {
       'rgba(0, 230, 118, 0.9)',    // Green
       
       'rgba(103, 58, 183, 0.9)',   // Deep Purple
-      'rgba(0, 150, 136, 0.9)' ,    // Teal
+      'rgba(0, 150, 136, 0.9)' ,    /* Teal */
       'rgba(224, 64, 251, 0.9)',   /* Pinkish Purple */
       'rgba(41, 182, 246, 0.9)',    /* Light Blue */
       'rgba(244, 143, 177, 0.9)',  /* Pink */
@@ -1827,7 +2300,6 @@ const Home = ({ onSongSelect, username }) => {
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
-  // Function to get time-based greeting
   const getTimeBasedGreeting = () => {
     const currentHour = new Date().getHours();
     if (currentHour < 5) return 'Good Night!';
@@ -1841,40 +2313,32 @@ const Home = ({ onSongSelect, username }) => {
 };
 
   useEffect(() => {
-    // Generate a random color for this Snackbar instance
     const dynamicColor = generateVibrantColor();
     
-    // Get current time-based greeting
     const greeting = getTimeBasedGreeting();
     
-    // Always show a message on component mount for testing
     const randomMessage = musicMessages[Math.floor(Math.random() * musicMessages.length)];
     
-    // Personalize with username if available
     const fullMessage = username 
       ? `${greeting}, ${username}! 👋\n${randomMessage}` 
       : `${greeting}! 👋\n${randomMessage}`;
     
     console.log('Attempting to show message:', fullMessage);
     
-    // Ensure state updates are processed
     const timer = setTimeout(() => {
       setSnackbarMessage(fullMessage);
       setOpenSnackbar(true);
       
-      // Store the dynamic color for this Snackbar instance
       localStorage.setItem('currentSnackbarColor', dynamicColor);
       
       console.log('Snackbar should now be visible');
     }, 500);
 
-    // Automatically close the Snackbar after 6 seconds
     const closeTimer = setTimeout(() => {
       setOpenSnackbar(false);
       console.log('Snackbar should now be closed');
     }, 6500);
 
-    // Cleanup function
     return () => {
       clearTimeout(timer);
       clearTimeout(closeTimer);
@@ -1900,13 +2364,10 @@ const Home = ({ onSongSelect, username }) => {
       }
     };
 
-    // Initial setup
     updateSnackbarStyle();
 
-    // Add event listener for window resize
     window.addEventListener('resize', updateSnackbarStyle);
 
-    // Cleanup listener
     return () => window.removeEventListener('resize', updateSnackbarStyle);
   }, []);
 
@@ -1984,6 +2445,9 @@ const Home = ({ onSongSelect, username }) => {
           </Paper>
         </Box>
       </Box>
+
+      {/* Quick Picks section */}
+      <QuickPicks onSongSelect={onSongSelect} />
 
       {/* Top Charts section */}
       <Box sx={{ mb: { xs: 3, sm: 4 }, overflowX: 'hidden', px: 1 }}>

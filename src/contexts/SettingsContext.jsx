@@ -26,44 +26,46 @@ export const SettingsProvider = ({ children }) => {
       return downloadUrls;
     }
     
-    // Debug log the input
-    console.log('Target Quality:', targetQuality);
-    console.log('Available Download URLs:', downloadUrls);
-    
     // Map quality strings to Saavn's quality codes
     const qualityMap = {
-      '96kbps': '96',
-      '160kbps': '160',
-      '320kbps': '320'
+      '96kbps': '96kbps',
+      '160kbps': '160kbps',
+      '320kbps': '320kbps'
     };
     
-    // Get target quality code
-    const targetQualityCode = qualityMap[targetQuality] || '320';
-    console.log('Target Quality Code:', targetQualityCode);
+    // Get target quality
+    const targetQualityString = qualityMap[targetQuality] || '320kbps';
     
-    // Find exact quality match first
-    let selectedUrl = downloadUrls.find(url => {
-      const urlQuality = url.quality || '';
-      return urlQuality.toString() === targetQualityCode;
-    });
+    // Find exact quality match
+    let selectedUrl = downloadUrls.find(url => url.quality === targetQualityString);
     
     // If no exact match, find closest higher quality
     if (!selectedUrl) {
-      const validUrls = downloadUrls
-        .filter(url => url.quality && !isNaN(parseInt(url.quality)))
-        .sort((a, b) => parseInt(a.quality) - parseInt(b.quality));
+      const availableQualities = downloadUrls
+        .map(url => parseInt(url.quality))
+        .filter(q => !isNaN(q))
+        .sort((a, b) => a - b);
       
-      selectedUrl = validUrls.find(url => parseInt(url.quality) >= parseInt(targetQualityCode)) || validUrls[0];
+      const targetQualityNum = parseInt(targetQualityString);
+      const higherQuality = availableQualities.find(q => q >= targetQualityNum);
+      
+      if (higherQuality) {
+        selectedUrl = downloadUrls.find(url => 
+          parseInt(url.quality) === higherQuality
+        );
+      }
     }
     
-    if (selectedUrl) {
-      console.log('Selected Quality:', selectedUrl.quality);
-      console.log('Selected URL:', selectedUrl.url);
-      return selectedUrl.url;
+    // If still no match, use the highest available quality
+    if (!selectedUrl && downloadUrls.length > 0) {
+      selectedUrl = downloadUrls.reduce((prev, curr) => {
+        const prevQuality = parseInt(prev.quality);
+        const currQuality = parseInt(curr.quality);
+        return currQuality > prevQuality ? curr : prev;
+      });
     }
-    
-    console.warn('No valid quality URLs found, using first available URL');
-    return downloadUrls[0]?.url;
+
+    return selectedUrl;
   };
 
   const value = {

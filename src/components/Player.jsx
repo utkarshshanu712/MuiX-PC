@@ -21,6 +21,8 @@ import {
   ListItemAvatar,
   ListItemText,
   Avatar,
+  Tooltip,
+  CircularProgress
 } from "@mui/material";
 import {
   Pause,
@@ -40,6 +42,8 @@ import {
   ExpandMore,
   PlaylistAdd,
   Close,
+  PlaylistPlay,
+  Shuffle
 } from "@mui/icons-material";
 import ExpandedPlayer from "./ExpandedPlayer";
 import { useLocalStorage } from "../hooks/useLocalStorage";
@@ -328,23 +332,18 @@ const Player = ({
   const [timerRemaining, setTimerRemaining] = useState(null);
   const [timerIntervalId, setTimerIntervalId] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isContinuousPlay, setIsContinuousPlay] = useState(false);
 
   // Refs
   const audioRef = useRef(new Audio());
 
   // Context hooks
   const { enqueueSnackbar } = useSnackbar();
-  const { addToRecentlyPlayed } = useLibrary();
+  const { addToRecentlyPlayed } = useUserPreferences();
   const { downloadQuality } = useUserPreferences();
+  const { streamingQuality, getUrlForQuality } = useSettings();
 
-  // Check if track is liked on mount and when track changes
-  useEffect(() => {
-    if (currentTrack) {
-      const likedSongs = JSON.parse(localStorage.getItem('likedSongs') || '[]');
-      setIsLiked(likedSongs.some(song => song.id === currentTrack.id));
-    }
-  }, [currentTrack]);
-
+  // Callback hooks
   const handleLikeClick = useCallback(() => {
     if (!currentTrack) return;
 
@@ -372,16 +371,6 @@ const Player = ({
     localStorage.setItem('likedSongs', JSON.stringify(likedSongs));
   }, [currentTrack, enqueueSnackbar]);
 
-  // Update play history when track changes
-  useEffect(() => {
-    if (currentTrack) {
-      setPlayHistory(prev => {
-        const newHistory = prev.filter(track => track.id !== currentTrack.id);
-        return [currentTrack, ...newHistory].slice(0, 50); // Keep last 50 tracks
-      });
-    }
-  }, [currentTrack]);
-
   const handlePlayPause = useCallback(async () => {
     if (playbackError) return;
 
@@ -404,7 +393,7 @@ const Player = ({
     }
   }, [isPlaying, playbackError]);
 
-  const loadAndPlayTrack = async () => {
+  const loadAndPlayTrack = useCallback(async () => {
     if (!currentTrack) return;
     
     try {
@@ -418,10 +407,10 @@ const Player = ({
         audioUrl = currentTrack.audioUrl;
       } 
       else if (currentTrack.downloadUrl && Array.isArray(currentTrack.downloadUrl)) {
-        const urls = currentTrack.downloadUrl
-          .filter(url => url && (url.link || url.url))
-          .map(url => url.link || url.url);
-        audioUrl = urls[0];
+        const selectedQuality = getUrlForQuality(currentTrack.downloadUrl, streamingQuality);
+        if (selectedQuality) {
+          audioUrl = selectedQuality.url;
+        }
       }
       else if (currentTrack.downloadUrl && typeof currentTrack.downloadUrl === 'string') {
         audioUrl = currentTrack.downloadUrl;
@@ -429,37 +418,35 @@ const Player = ({
       else if (currentTrack.url) {
         audioUrl = currentTrack.url;
       }
-      else if (currentTrack.media && currentTrack.media.url) {
-        audioUrl = currentTrack.media.url;
-      }
 
       if (!audioUrl) {
-        throw new Error('No valid audio source found');
+        throw new Error('No playable audio URL found');
       }
 
       audio.src = audioUrl;
       await audio.load();
-      audio.volume = isMuted ? 0 : volume;
       
       if (isPlaying) {
         await audio.play();
+        // Add to recently played when playback starts successfully
+        if (currentTrack && currentTrack.id) {
+          addToRecentlyPlayed({
+            ...currentTrack,
+            timestamp: new Date().getTime()
+          });
+        }
       }
-
-      setError(null);
       
-      if (addToRecentlyPlayed && currentTrack) {
-        addToRecentlyPlayed(currentTrack);
-      }
-
-    } catch (err) {
-      console.error('Track loading error:', err);
-      setError(err.message || 'Failed to load track');
-      enqueueSnackbar(err.message || 'Failed to load track', { variant: 'error' });
-      setIsPlaying(false);
+      setPlaybackError(null);
+    } catch (error) {
+      console.error('Error loading track:', error);
+      setPlaybackError(error.message);
+      setError('Failed to load audio');
+      enqueueSnackbar('Failed to load audio', { variant: 'error' });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentTrack, isPlaying, streamingQuality, getUrlForQuality, enqueueSnackbar, addToRecentlyPlayed]);
 
   const handleTimeUpdate = useCallback(() => {
     const audio = audioRef.current;
@@ -496,26 +483,6 @@ const Player = ({
       audioRef.current.currentTime = 0;
     }
   }, [playHistory, onPrevious]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-
-    const handleEnded = () => {
-      if (queue.length > 0) {
-        handleNext();
-      } else {
-        setIsPlaying(false);
-      }
-    };
-
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-
-    return () => {
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, [handleTimeUpdate, handleNext, queue.length]);
 
   const handleSliderChange = useCallback((_, newValue) => {
     const audio = audioRef.current;
@@ -559,23 +526,6 @@ const Player = ({
     handleCloseQueue();
   }, [onQueueItemClick, handleCloseQueue]);
 
-  useEffect(() => {
-    if (!currentTrack) return;
-
-    const audio = audioRef.current;
-    audio.src = currentTrack?.downloadUrl || '';
-
-    const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
-    };
-
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-
-    return () => {
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-    };
-  }, [currentTrack]);
-
   const handleVolumeChange = useCallback((event, newValue) => {
     if (audioRef.current) {
       audioRef.current.volume = newValue;
@@ -600,33 +550,29 @@ const Player = ({
     }
   }, [isMuted, volume]);
 
-  useEffect(() => {
-    audioRef.current.volume = isMuted ? 0 : volume;
-  }, [volume, isMuted]);
-
-  const formatTime = (time) => {
+  const formatTime = useCallback((time) => {
     if (!time) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const formatTimerDisplay = (seconds) => {
+  const formatTimerDisplay = useCallback((seconds) => {
     if (!seconds) return '';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const handleTimerClick = (event) => {
+  const handleTimerClick = useCallback((event) => {
     setTimerAnchorEl(event.currentTarget);
-  };
+  }, []);
 
-  const handleTimerClose = () => {
+  const handleTimerClose = useCallback(() => {
     setTimerAnchorEl(null);
-  };
+  }, []);
 
-  const handleTimerSet = (duration) => {
+  const handleTimerSet = useCallback((duration) => {
     setTimerDuration(duration);
     setTimerRemaining(duration * 60); // Convert minutes to seconds
     handleTimerClose();
@@ -652,33 +598,24 @@ const Player = ({
     }, 1000);
 
     setTimerIntervalId(intervalId);
-  };
+  }, [timerIntervalId]);
 
-  const handleTimerCancel = () => {
+  const handleTimerCancel = useCallback(() => {
     if (timerIntervalId) {
       clearInterval(timerIntervalId);
     }
     setTimerDuration(null);
     setTimerRemaining(null);
     handleTimerClose();
-  };
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (timerIntervalId) {
-        clearInterval(timerIntervalId);
-      }
-    };
   }, [timerIntervalId]);
 
-  const formatTimerTime = (seconds) => {
+  const formatTimerTime = useCallback((seconds) => {
     if (!seconds) return "";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const remainingSeconds = seconds % 60;
     return `${hours > 0 ? hours + ":" : ""}${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
-  };
+  }, []);
 
   const volumeControls = useMemo(
     () => (
@@ -997,12 +934,6 @@ const Player = ({
     onQueueItemClick: PropTypes.func.isRequired,
   };
 
-  useEffect(() => {
-    if (currentTrack) {
-      loadAndPlayTrack();
-    }
-  }, [currentTrack]);
-
   const getDisplayInfo = useCallback(() => {
     if (!currentTrack) return null;
 
@@ -1030,11 +961,6 @@ const Player = ({
   }, [currentTrack]);
 
   const displayInfo = getDisplayInfo();
-
-  // Early return if no track is playing
-  if (!currentTrack) {
-    return null;
-  }
 
   const handlePlaylistMenuOpen = useCallback((event) => {
     event.stopPropagation();
@@ -1199,6 +1125,132 @@ const Player = ({
       console.log('Setting isDownloading to false.');
     }
   }, [currentTrack, downloadQuality, enqueueSnackbar, isDownloading]);
+
+  const handleContinuousPlay = useCallback(async () => {
+    if (!currentTrack) return;
+
+    setIsContinuousPlay(prev => !prev);
+    if (!isContinuousPlay && queue.length === 0) {
+      try {
+        setIsLoading(true);
+        // Get similar songs based on current track
+        const response = await fetch(`https://saavn.me/search/songs?query=${encodeURIComponent(currentTrack.title + ' ' + currentTrack.artist)}&limit=20`);
+        const data = await response.json();
+        
+        if (data.data.results) {
+          const newSongs = data.data.results
+            .filter(song => song.id !== currentTrack.id)
+            .map(song => {
+              // Map the download URLs to match our expected format
+              const downloadUrls = song.downloadUrl.map(url => ({
+                quality: url.quality,
+                url: url.link
+              }));
+
+              // Get the URL for current quality setting
+              const selectedQuality = getUrlForQuality(downloadUrls, streamingQuality);
+
+              return {
+                id: song.id,
+                title: song.name,
+                artist: song.primaryArtists,
+                artwork: song.image?.[2]?.link || '/default-artwork.png',
+                downloadUrl: downloadUrls, // Keep all download URLs for quality switching
+                url: selectedQuality?.url, // Use the selected quality URL
+                duration: song.duration
+              };
+            });
+
+          // Shuffle the songs
+          const shuffledSongs = [...newSongs].sort(() => Math.random() - 0.5);
+          onQueueItemClick(shuffledSongs);
+          enqueueSnackbar('Added similar songs to queue', { variant: 'success' });
+        }
+      } catch (error) {
+        console.error('Error fetching similar songs:', error);
+        enqueueSnackbar('Failed to create continuous play queue', { variant: 'error' });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  }, [currentTrack, isContinuousPlay, queue.length, onQueueItemClick, enqueueSnackbar, streamingQuality, getUrlForQuality]);
+
+  // Effect hooks
+  useEffect(() => {
+    if (currentTrack) {
+      loadAndPlayTrack();
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if (currentTrack) {
+      const likedSongs = JSON.parse(localStorage.getItem('likedSongs') || '[]');
+      setIsLiked(likedSongs.some(song => song.id === currentTrack.id));
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if (currentTrack) {
+      setPlayHistory(prev => {
+        const newHistory = prev.filter(track => track.id !== currentTrack.id);
+        return [currentTrack, ...newHistory].slice(0, 50); // Keep last 50 tracks
+      });
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+
+    const handleEnded = () => {
+      if (queue.length > 0) {
+        handleNext();
+      } else {
+        setIsPlaying(false);
+      }
+    };
+
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [handleTimeUpdate, handleNext, queue.length]);
+
+  useEffect(() => {
+    audioRef.current.volume = isMuted ? 0 : volume;
+  }, [volume, isMuted]);
+
+  useEffect(() => {
+    if (timerIntervalId) {
+      clearInterval(timerIntervalId);
+    }
+  }, [timerIntervalId]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    
+    const handlePlay = () => {
+      if (currentTrack && currentTrack.id) {
+        addToRecentlyPlayed({
+          ...currentTrack,
+          timestamp: new Date().getTime()
+        });
+      }
+    };
+
+    audio.addEventListener('play', handlePlay);
+    
+    return () => {
+      audio.removeEventListener('play', handlePlay);
+    };
+  }, [currentTrack, addToRecentlyPlayed]);
+
+  // Early return if no track is playing
+  if (!currentTrack) {
+    return null;
+  }
 
   return (
     <>
@@ -1450,6 +1502,18 @@ const Player = ({
             >
               <QueueMusic sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
             </IconButton>
+
+            {/* Continuous Play Button */}
+            <Tooltip title={isContinuousPlay ? "Continuous Play On" : "Continuous Play Off"}>
+              <IconButton
+                onClick={handleContinuousPlay}
+                color={isContinuousPlay ? "primary" : "default"}
+                disabled={isLoading}
+              >
+                <PlaylistPlay />
+              </IconButton>
+            </Tooltip>
+            {isLoading && <CircularProgress size={24} sx={{ ml: 1 }} />}
           </Box>
         </Box>
       </Box>
