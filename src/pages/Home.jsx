@@ -781,7 +781,7 @@ const AlbumCard = ({ album, onAlbumSelect }) => {
         >
           {album.name}
         </Typography>
-        <Typography 
+        {/* <Typography 
           variant="body2"
           sx={{
             color: 'rgba(255,255,255,0.7)',
@@ -793,7 +793,7 @@ const AlbumCard = ({ album, onAlbumSelect }) => {
           }}
         >
           {getArtistNames(album)}
-        </Typography>
+        </Typography> */}
       </Box>
     </Box>
   );
