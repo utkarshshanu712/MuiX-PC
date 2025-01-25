@@ -69,7 +69,7 @@ export const LibraryProvider = ({ children }) => {
           return {
             ...playlist,
             songs: [...playlist.songs, song],
-            thumbnail: playlist.thumbnail || song.image?.[0]?.url
+            thumbnail: playlist.thumbnail || song.image?.[2]?.url
           };
         }
         return playlist;
