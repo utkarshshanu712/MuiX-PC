@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, IconButton } from '@mui/material';
-import { PlayArrow, Shuffle, Delete, Download } from '@mui/icons-material';
+import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, IconButton, Grid } from '@mui/material';
+import { PlayArrow, Shuffle, Delete, Download, Favorite } from '@mui/icons-material';
 import SongList from '../components/SongList';
 import { useLibrary } from '../contexts/LibraryContext';
 
@@ -87,6 +87,12 @@ const Playlist = ({ onSongSelect }) => {
     }
   };
 
+  const formatDuration = (duration) => {
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   if (!playlist) {
     return (
       <Box sx={{ 
@@ -114,17 +120,23 @@ const Playlist = ({ onSongSelect }) => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', gap: 3, mb: 4 }}>
-        <Box sx={{ 
-          width: 200, 
-          height: 200, 
-          borderRadius: 2,
-          overflow: 'hidden',
+    <Box sx={{ p: { xs: 1, sm: 3 }, mb: { xs: 1, sm: 4 } }}>
+      <Box sx={{ 
+        display: 'flex',
+        gap: 3,
+        mb: 4,
+        bgcolor: 'rgba(29, 185, 84, 0.3)',
+        borderRadius: 2,
+        p: { xs: 1, sm: 3 }
+      }}>
+        <Box sx={{
+          width: { xs: 80, sm: 160 },
+          height: { xs: 80, sm: 150 },
           bgcolor: '#282828',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          borderRadius: 2
         }}>
           {playlist.thumbnail ? (
             <img
@@ -133,138 +145,155 @@ const Playlist = ({ onSongSelect }) => {
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
-            <Typography variant="h1" sx={{ color: '#1db954' }}>
-              {playlist.name[0].toUpperCase()}
-            </Typography>
+            <Favorite sx={{ fontSize: { xs: 40, sm: 140 }, color: '#1db954' }} />
           )}
         </Box>
 
-        <Box>
-          <Typography variant="overline">Playlist</Typography>
-          <Typography variant="h3" sx={{ mb: 2 }}>{playlist.name}</Typography>
-          <Typography variant="body1" color="text.secondary">
-            {playlist.songs.length} songs
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-            {playlist.songs.length > 0 && (
-              <>
-                <Button
-                  variant="contained"
-                  startIcon={<PlayArrow />}
-                  onClick={() => handlePlayAll(false)}
-                  sx={{
-                    bgcolor: '#1db954',
-                    '&:hover': { bgcolor: '#1ed760' }
-                  }}
-                >
-                  Play All
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<Shuffle />}
-                  onClick={() => handlePlayAll(true)}
-                  sx={{
-                    bgcolor: '#1db954',
-                    '&:hover': { bgcolor: '#1ed760' }
-                  }}
-                >
-                  Shuffle
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<Download />}
-                  onClick={handleDownloadPlaylist}
-                  sx={{
-                    bgcolor: '#1db954',
-                    '&:hover': { bgcolor: '#1ed760' }
-                  }}
-                >
-                  Download Playlist
-                </Button>
-              </>
-            )}
-            <Button
-              variant="outlined"
-              startIcon={<Delete />}
-              onClick={handleDeletePlaylist}
-              sx={{
-                borderColor: '#ff5252',
-                color: '#ff5252',
-                '&:hover': {
-                  borderColor: '#ff1744',
-                  bgcolor: 'rgba(255, 82, 82, 0.08)'
-                }
-              }}
-            >
-              Delete Playlist
-            </Button>
+        <Box sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: { xs: 'flex-end', sm: 'space-between' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: 1,
+          mb: 3
+        }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="overline" color="text.secondary">Playlist</Typography>
+            <Typography variant="h1" sx={{ fontSize: { xs: '0.8rem', sm: '3.5rem' }, fontWeight: 'bold' }}>
+              {playlist.name}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography color="text.secondary" variant="body2">
+              {playlist.songs.length} songs
+            </Typography>
           </Box>
         </Box>
       </Box>
 
-      {playlist.songs.length > 0 ? (
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ color: "gray" }}>#</TableCell>
-                <TableCell sx={{ color: "gray" }}>Title</TableCell>
-                <TableCell sx={{ color: "gray" }}>Artist</TableCell>
-                <TableCell sx={{ color: "gray" }}>Duration</TableCell>
-                <TableCell sx={{ color: "gray" }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {playlist.songs.map((song, index) => (
-                <TableRow
-                  key={song.id}
-                  sx={{
-                    "&:hover": {
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    },
-                    cursor: "pointer",
-                  }}
-                  onClick={() => onSongSelect(song, playlist.songs.filter(s => s.id !== song.id))}
-                >
-                  <TableCell sx={{ color: "white" }}>{index + 1}</TableCell>
-                  <TableCell sx={{ color: "white" }}>{song.name}</TableCell>
-                  <TableCell sx={{ color: "white" }}>
-                    {song.primaryArtists}
-                  </TableCell>
-                  <TableCell sx={{ color: "white" }}>
-                    {/* formatDuration(song.duration) */}
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownloadSong(song);
-                      }}
-                      sx={{ color: "white" }}
-                    >
-                      <Download />
-                    </IconButton>
-                    <IconButton
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveSong(song.id);
-                      }}
-                      sx={{ color: "white" }}
-                    >
-                      <Delete />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      ) : (
-        <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
-          This playlist is empty. Add some songs to get started!
-        </Typography>
-      )}
+      <Box sx={{ mb: 4 }}>
+        {playlist.songs.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 2, mb: 0 }}>
+            <IconButton
+              onClick={() => handlePlayAll(false)}
+              sx={{
+                mb: 3,
+                p: { xs: 1, sm: 1.5 },
+                bgcolor: '#1db954',
+                '&:hover': { bgcolor: '#1ed760', transform: 'scale(1.04)' },
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <PlayArrow sx={{ fontSize: { xs: 40, sm: 50 }, color: 'white' }} />
+            </IconButton>
 
+            <IconButton
+              onClick={() => handlePlayAll(true)}
+              sx={{
+                mb: 3,
+                p: { xs: 1, sm: 1.5 },
+                bgcolor: '#1db954',
+                '&:hover': { bgcolor: '#1ed760', transform: 'scale(1.04)' },
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Shuffle sx={{ fontSize: { xs: 40, sm: 50 }, color: 'white' }} />
+            </IconButton>
+            <IconButton
+              onClick={handleDownloadPlaylist}
+              sx={{
+                mb: 3,
+                p: { xs: 1, sm: 1.5 },
+                bgcolor: '#1db954',
+                '&:hover': { bgcolor: '#1ed760', transform: 'scale(1.04)' },
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Download sx={{ fontSize: { xs: 40, sm: 50 }, color: 'white' }} />
+            </IconButton>
+          </Box>
+        )}
+
+        <Grid container sx={{ mt: 2, px: 2 }} columns={14}>
+          <Grid item xs={1}><Typography color="text.secondary">#</Typography></Grid>
+          <Grid item xs={5}><Typography color="text.secondary">Title</Typography></Grid>
+          <Grid item xs={4} sx={{ display: { xs: 'block', sm: 'block', md: 'block' }, textAlign: 'left' }}>
+            <Typography color="text.secondary">Artist</Typography>
+          </Grid>
+          <Grid item xs={3} sx={{ display: { xs: 'none', sm: 'block', md: 'block' } }}>
+            <Typography color="text.secondary">Duration</Typography>
+          </Grid>
+          <Grid item xs={1} sx={{ display: { xs: 'block', sm: 'block', md: 'block' }, px: 4 }}>
+            <Typography color="text.secondary">Actions</Typography>
+          </Grid>
+        </Grid>
+
+        <Box sx={{ mt: 1, overflow: 'auto', height: 'calc(100vh - 250px)' }}>
+          {playlist.songs.map((song, index) => (
+            <Grid
+              container
+              key={song.id}
+              sx={{
+                py: 1,
+                px: 2,
+                alignItems: 'center',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: 1
+                },
+                cursor: 'pointer'
+              }}
+              columns={14}
+              onClick={() => onSongSelect(song, playlist.songs.filter(s => s.id !== song.id))}
+            >
+              <Grid item xs={1}><Typography>{index + 1}</Typography></Grid>
+              <Grid item xs={5}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <img
+                    src={song.image?.[2]?.url}
+                    alt={song.name}
+                    style={{ width: 40, height: 40, borderRadius: 4 }}
+                  />
+                  <Typography noWrap sx={{ fontSize: { xs: '0.7rem', sm: '1rem' } }}>{song.name}</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={4} sx={{ display: { xs: 'block', sm: 'block', md: 'block' }, textAlign: 'left', px: { xs: '1.5rem', sm: '0rem' } }}>
+                <Typography noWrap={false} color="text.secondary" sx={{ fontSize: { xs: '0.8rem', sm: '1rem' } }}>
+                  {song.artists.primary.map(artist => artist.name).join(', ') || 'Unknown Artist'}
+                </Typography>
+              </Grid>
+              <Grid item xs={3} sx={{ display: { xs: 'none', sm: 'block', md: 'block' } }}>
+                <Typography color="text.secondary">
+                  {formatDuration(song.duration)}
+                </Typography>
+              </Grid>
+              <Grid item xs={1} sx={{ display: { xs: 'block', sm: 'block', md: 'block' }, px: 4 }}>
+                <IconButton onClick={() => handleDownloadSong(song)}><Download /></IconButton>
+                <IconButton onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveSong(song.id);
+                }}><Delete /></IconButton>
+              </Grid>
+            </Grid>
+          ))}
+        </Box>
+      </Box>
+      <Button
+        variant="outlined"
+        startIcon={<Delete />}
+        onClick={handleDeletePlaylist}
+        sx={{
+          borderColor: '#ff5252',
+          color: '#ff5252',
+          '&:hover': {
+            borderColor: '#ff1744',
+            bgcolor: 'rgba(255, 82, 82, 0.08)'
+          }
+        }}
+      >
+        Delete Playlist
+      </Button>
       {/* Delete Song Confirmation Dialog */}
       <Dialog
         open={deleteDialogOpen}

@@ -313,6 +313,13 @@ const Downloads = () => {
                     },
                   }}
                 >
+                  <IconButton
+                    onClick={(e) => handleMenuOpen(e, song)}
+                    sx={{ color: 'text.secondary' }}
+                    size="small"
+                  >
+                    <MoreVert />
+                  </IconButton>
                   <Box sx={{ 
                     width: 40, 
                     display: 'flex', 
@@ -349,13 +356,6 @@ const Downloads = () => {
                       {song.artist} • {formatDuration(song.duration)}
                     </Typography>
                   </Box>
-                  <IconButton
-                    onClick={(e) => handleMenuOpen(e, song)}
-                    sx={{ color: 'text.secondary' }}
-                    size="small"
-                  >
-                    <MoreVert />
-                  </IconButton>
                 </Box>
               ))}
             </Box>
@@ -365,34 +365,30 @@ const Downloads = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ color: 'text.secondary', width: { sm: '5%', md: '5%' } }}>#</TableCell>
+                    <TableCell sx={{ color: 'text.secondary', width: { xs: '10%', sm: '5%' } }}></TableCell>
                     <TableCell sx={{ color: 'text.secondary', width: { sm: '45%', md: '40%' } }}>Title</TableCell>
-                    <TableCell sx={{ color: 'text.secondary', width: { sm: '25%', md: '30%' } }}>Date Added</TableCell>
-                    <TableCell sx={{ color: 'text.secondary', width: { sm: '15%', md: '15%' } }}>
+                    <TableCell sx={{ color: 'text.secondary', width: { sm: '25%', md: '30%' } }}>Artist</TableCell>
+                    <TableCell sx={{ color: 'text.secondary', width: { sm: '15%', md: '15%' } }}>Date Added</TableCell>
+                    <TableCell sx={{ color: 'text.secondary', width: { sm: '10%', md: '10%' } }}>
                       <AccessTime />
                     </TableCell>
-                    <TableCell sx={{ width: { sm: '10%', md: '10%' } }}></TableCell>
                   </TableRow>
                 </TableHead>
-               <TableBody>
-                   {downloads.map((song) => (
-                       <TableRow 
-                           key={song.id} 
-                           onClick={() => handlePlaySong(song)} // Add this line
-                           sx={{
-                               cursor: 'pointer',
-                               '&:hover': {
-                                   bgcolor: 'rgba(255, 255, 255, 0.1)',
-                               },
-                           }}
-                       >
-                           <TableCell>{song.name || song.title}</TableCell>
-                           <TableCell>{song.artist}</TableCell>
-                           <TableCell>{formatDate(song.downloadDate)}</TableCell>
-                           <TableCell>{formatDuration(song.duration)}</TableCell>
-                       </TableRow>
-                   ))}
-               </TableBody>
+                <TableBody>
+                  {downloads.map((song) => (
+                    <TableRow key={song.id} onClick={() => handlePlaySong(song)}>
+                      <TableCell sx={{ width: { xs: '10%', sm: '5%' } }}>
+                        <IconButton onClick={(e) => handleMenuOpen(e, song)} sx={{ color: 'text.secondary' }}>
+                          <MoreVert />
+                        </IconButton>
+                      </TableCell>
+                      <TableCell>{song.title || song.name}</TableCell>
+                      <TableCell>{song.artist}</TableCell>
+                      <TableCell>{formatDate(song.downloadDate)}</TableCell>
+                      <TableCell>{formatDuration(song.duration)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
               </Table>
             </TableContainer>
           )}
