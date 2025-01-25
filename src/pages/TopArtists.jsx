@@ -30,13 +30,13 @@ const TopArtists = () => {
         borderRadius: "4px",
       },
     }}>
-      <Typography variant="h4" sx={{ mb: 4, color: 'white' }}>
+      <Typography variant="h4" sx={{ mb: 4, color: 'white', textAlign: 'center' }}>
         Top Artists
       </Typography>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={2} sx={{justifyContent: { xs: 'center', sm: 'flex-start' }}}>
         {topArtists.map((artist) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={artist.id}>
+          <Grid item xs={6} sm={6} md={4} lg={3} key={artist.id} sx={{ display: 'flex', justifyContent: 'center' }}>
             <Card 
               onClick={() => handleArtistClick(artist.id)}
               sx={{ 
@@ -46,23 +46,33 @@ const TopArtists = () => {
                 '&:hover': {
                   bgcolor: 'rgba(255,255,255,0.1)',
                   transform: 'translateY(-5px)'
-                }
+                },
+                maxWidth: { xs: 280, sm: '100%' },
+                boxShadow: 3,
               }}
             >
               <CardMedia
                 component="img"
-                height="250"
+                sx={{ 
+                  objectFit: 'cover',
+                  height: { xs: 'auto', sm: 250 },
+                  width: { xs: '100%', sm: '100%' },
+                  aspectRatio: { xs: '1/1', sm: 'auto' },
+                  borderTopLeftRadius: 4,
+                  borderTopRightRadius: 4,
+                }}
                 image={artist.image}
                 alt={artist.name}
-                sx={{ objectFit: 'cover' }}
               />
               <CardContent sx={{ 
                 display: 'flex', 
                 justifyContent: 'space-between', 
-                alignItems: 'center' 
+                alignItems: 'center',
+                flexDirection: { xs: 'column', sm: 'row' },
+                textAlign: { xs: 'center', sm: 'left' }
               }}>
-                <Box>
-                  <Typography variant="h6" color="white">
+                <Box sx={{ mb: { xs: 1, sm: 0 } }}>
+                  <Typography variant="h6" color="white" noWrap>
                     {artist.name}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">

@@ -58,7 +58,7 @@ const Sidebar = () => {
   const mainMenuItems = [
     { text: 'Home', icon: <Home />, path: '/' },
     { text: 'Top Playlists', icon: <Language />, path: '/top-playlists' },
-    { text: 'For You', icon: <Whatshot />, path: '/for-you' },
+    // { text: 'For You', icon: <Whatshot />, path: '/for-you' },
     { text: 'Search', icon: <Search />, path: '/search' },
   ];
   const playlistItems = [

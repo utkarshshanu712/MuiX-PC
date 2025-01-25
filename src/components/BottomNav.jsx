@@ -1,7 +1,8 @@
 import React from 'react';
 import { BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
-import { Home, LibraryMusic, PlaylistPlay, Favorite, Whatshot } from '@mui/icons-material';
+import { Home, LibraryMusic, PlaylistPlay, Favorite, Person } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useArtists } from '../contexts/ArtistContext';
 
 const BottomNav = () => {
   const navigate = useNavigate();
@@ -10,11 +11,18 @@ const BottomNav = () => {
   const getCurrentValue = () => {
     const path = location.pathname;
     if (path === '/') return 0;
-    if (path === '/for-you') return 1;
-    if (path === '/top-playlists') return 2;
+    if (path === '/top-playlists') return 1;
+    if (path === '/top-artists') return 2;
     if (path === '/library') return 3;
     return 0;
   };
+
+  const navItems = [
+    { text: 'Home', icon: <Home />, path: '/' },
+    { text: 'Top Playlists', icon: <PlaylistPlay />, path: '/top-playlists' },
+    { text: 'Top Artists', icon: <Person />, path: '/top-artists' },
+    { text: 'Library', icon: <LibraryMusic />, path: '/library' },
+  ];
 
   return (
     <Paper 
@@ -41,22 +49,8 @@ const BottomNav = () => {
         showLabels
         value={getCurrentValue()}
         onChange={(event, newValue) => {
-          switch(newValue) {
-            case 0:
-              navigate('/');
-              break;
-            case 1:
-              navigate('/for-you');
-              break;
-            case 2:
-              navigate('/top-playlists');
-              break;
-            case 3:
-              navigate('/library');
-              break;
-            default:
-              navigate('/');
-          }
+          const item = navItems[newValue];
+          navigate(item.path);
         }}
         sx={{
           bgcolor: '#282828',
@@ -68,10 +62,9 @@ const BottomNav = () => {
           }
         }}
       >
-        <BottomNavigationAction label="Home" icon={<Home />} />
-        <BottomNavigationAction label="For You" icon={<Whatshot />} />
-        <BottomNavigationAction label="Top Playlists" icon={<PlaylistPlay />} />
-        <BottomNavigationAction label="Library" icon={<LibraryMusic />} />
+        {navItems.map((item, index) => (
+          <BottomNavigationAction key={index} label={item.text} icon={item.icon} />
+        ))}
       </BottomNavigation>
     </Paper>
   );
