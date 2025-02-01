@@ -1275,7 +1275,7 @@ const Player = ({
           "&:hover": {
             bgcolor: "#333333",
           },
-          marginLeft: { xs: 0, sm: 0, md: '18%' }, // No margin for xs and sm, 15% margin for md and above
+          marginLeft: { xs: 0, sm: 0, md: '15.8%' }, // No margin for xs and sm, 15% margin for md and above
           zIndex: 1200, // Ensure player stays above other content
         }}
       >

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const SettingsContext = createContext();
@@ -12,8 +12,31 @@ export const useSettings = () => {
 };
 
 export const SettingsProvider = ({ children }) => {
+  // Audio Quality Settings
   const [streamingQuality, setStreamingQuality] = useLocalStorage('streamingQuality', '320kbps');
   const [downloadQuality, setDownloadQuality] = useLocalStorage('downloadQuality', '320kbps');
+
+  // Display Settings
+  const [showExplicitContent, setShowExplicitContent] = useLocalStorage('showExplicitContent', true);
+  const [enableAnimations, setEnableAnimations] = useLocalStorage('enableAnimations', true);
+  const [showLyrics, setShowLyrics] = useLocalStorage('showLyrics', true);
+  const [autoplayEnabled, setAutoplayEnabled] = useLocalStorage('autoplayEnabled', true);
+
+  // Data Settings
+  const [dataSaver, setDataSaver] = useLocalStorage('dataSaver', false);
+  const [offlineMode, setOfflineMode] = useLocalStorage('offlineMode', false);
+  const [cacheEnabled, setCacheEnabled] = useLocalStorage('cacheEnabled', true);
+
+  // Notification Settings
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage('notificationsEnabled', true);
+  const [newMusicNotifications, setNewMusicNotifications] = useLocalStorage('newMusicNotifications', true);
+  const [playlistUpdates, setPlaylistUpdates] = useLocalStorage('playlistUpdates', true);
+
+  // Audio Settings
+  const [crossfadeEnabled, setCrossfadeEnabled] = useLocalStorage('crossfadeEnabled', false);
+  const [crossfadeDuration, setCrossfadeDuration] = useLocalStorage('crossfadeDuration', 5);
+  const [normalizeVolume, setNormalizeVolume] = useLocalStorage('normalizeVolume', true);
+  const [equalizerEnabled, setEqualizerEnabled] = useLocalStorage('equalizerEnabled', false);
 
   const qualityOptions = [
     { label: 'Normal (96 kbps)', value: '96kbps' },
@@ -69,11 +92,49 @@ export const SettingsProvider = ({ children }) => {
   };
 
   const value = {
+    // Audio Quality
     streamingQuality,
     setStreamingQuality,
     downloadQuality,
     setDownloadQuality,
     qualityOptions,
+    
+    // Display Settings
+    showExplicitContent,
+    setShowExplicitContent,
+    enableAnimations,
+    setEnableAnimations,
+    showLyrics,
+    setShowLyrics,
+    autoplayEnabled,
+    setAutoplayEnabled,
+
+    // Data Settings
+    dataSaver,
+    setDataSaver,
+    offlineMode,
+    setOfflineMode,
+    cacheEnabled,
+    setCacheEnabled,
+
+    // Notification Settings
+    notificationsEnabled,
+    setNotificationsEnabled,
+    newMusicNotifications,
+    setNewMusicNotifications,
+    playlistUpdates,
+    setPlaylistUpdates,
+
+    // Audio Settings
+    crossfadeEnabled,
+    setCrossfadeEnabled,
+    crossfadeDuration,
+    setCrossfadeDuration,
+    normalizeVolume,
+    setNormalizeVolume,
+    equalizerEnabled,
+    setEqualizerEnabled,
+
     getUrlForQuality,
   };
 

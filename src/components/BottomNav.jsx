@@ -1,70 +1,73 @@
-import React from 'react';
-import { BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
-import { Home, LibraryMusic, PlaylistPlay, Favorite, Person } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useArtists } from '../contexts/ArtistContext';
+import React from "react";
+import { BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
+import { Home, Search, LibraryMusic, Settings } from "@mui/icons-material";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useTheme } from "@mui/material/styles";
 
 const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
-
-  const getCurrentValue = () => {
-    const path = location.pathname;
-    if (path === '/') return 0;
-    if (path === '/top-playlists') return 1;
-    if (path === '/top-artists') return 2;
-    if (path === '/library') return 3;
-    return 0;
-  };
-
-  const navItems = [
-    { text: 'Home', icon: <Home />, path: '/' },
-    { text: 'Top Playlists', icon: <PlaylistPlay />, path: '/top-playlists' },
-    { text: 'Top Artists', icon: <Person />, path: '/top-artists' },
-    { text: 'Library', icon: <LibraryMusic />, path: '/library' },
-  ];
+  const theme = useTheme();
 
   return (
-    <Paper 
-      sx={{ 
-        position: 'fixed', 
-        bottom: 0, 
-        left: 0, 
+    <Paper
+      sx={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
         right: 0,
-        display: { xs: 'block', md: 'none' },
         zIndex: 1100,
-        height: '56px',
-        bgcolor: 'rgba(18, 18, 18, 0.95)',
-        backdropFilter: 'blur(10px)',
-        borderTop: '1px solid rgba(255,255,255,0.1)',
-        '& .MuiBottomNavigation-root': {
-          height: '100%',
-          minHeight: '56px',
-          bgcolor: 'transparent',
-        }
-      }} 
+        borderTop: `1px solid ${theme.palette.divider}`,
+        bgcolor: theme.palette.background.elevated,
+        backdropFilter: "blur(10px)",
+      }}
       elevation={3}
     >
       <BottomNavigation
-        showLabels
-        value={getCurrentValue()}
-        onChange={(event, newValue) => {
-          const item = navItems[newValue];
-          navigate(item.path);
+        value={location.pathname}
+        onChange={(_, newValue) => {
+          navigate(newValue);
         }}
         sx={{
-          bgcolor: '#282828',
-          '& .MuiBottomNavigationAction-root': {
-            color: '#b3b3b3',
-            '&.Mui-selected': {
-              color: '#1DB954'
-            }
-          }
+          bgcolor: "transparent",
+          height: 65,
+          "& .MuiBottomNavigationAction-root": {
+            color: theme.palette.text.secondary,
+            minWidth: "auto",
+            padding: "6px 0",
+            "&.Mui-selected": {
+              color: theme.palette.primary.main,
+              "& .MuiSvgIcon-root": {
+                transform: "scale(1.1)",
+              },
+            },
+            "& .MuiSvgIcon-root": {
+              fontSize: "1.5rem",
+              transition: "transform 0.2s",
+            },
+            "& .MuiBottomNavigationAction-label": {
+              fontSize: "0.75rem",
+              fontWeight: 500,
+            },
+          },
         }}
       >
-        {navItems.map((item, index) => (
-          <BottomNavigationAction key={index} label={item.text} icon={item.icon} />
-        ))}
+        <BottomNavigationAction label="Home" value="/" icon={<Home />} />
+        <BottomNavigationAction
+          label="Search"
+          value="/search"
+          icon={<Search />}
+        />
+        <BottomNavigationAction
+          label="Library"
+          value="/library"
+          icon={<LibraryMusic />}
+        />
+        <BottomNavigationAction
+          label="Settings"
+          value="/settings"
+          icon={<Settings />}
+        />
       </BottomNavigation>
     </Paper>
   );

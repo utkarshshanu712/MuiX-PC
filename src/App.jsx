@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Box, CssBaseline, ThemeProvider, createTheme, useTheme, useMediaQuery } from '@mui/material';
 import axios from "axios";
@@ -31,6 +31,9 @@ import { useLocalStorage } from "./hooks/useLocalStorage";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
 import ErrorBoundary from './components/ErrorBoundary';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
+import { useThemeContext } from './contexts/ThemeContext';
+import { ThemeProvider as CustomThemeProvider } from './contexts/ThemeContext';
 
 const darkTheme = createTheme({
   palette: {
@@ -57,14 +60,53 @@ const darkTheme = createTheme({
 });
 
 function AppContent() {
+  const { theme } = useThemeContext();
   const { isDownloadsActive } = useDownloadsAudio();
   const location = useLocation();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const muiTheme = useTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const drawerWidth = 240;
   const [navigationKey, setNavigationKey] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
   const isForYouPage = location.pathname === '/for-you';
+
+  // Remove the second theme declaration and move component overrides to ThemeContext
+  const componentOverrides = useMemo(() => ({
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          scrollbarColor: "rgba(255, 255, 255, 0.3) transparent",
+          "&::-webkit-scrollbar, & *::-webkit-scrollbar": {
+            width: 8,
+          },
+          "&::-webkit-scrollbar-thumb, & *::-webkit-scrollbar-thumb": {
+            borderRadius: 4,
+            backgroundColor: "rgba(255, 255, 255, 0.3)",
+            border: "2px solid transparent",
+          },
+          "&::-webkit-scrollbar-track, & *::-webkit-scrollbar-track": {
+            backgroundColor: "transparent",
+          },
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          backgroundColor: theme.palette.background.paper,
+          borderRadius: theme.shape.borderRadius,
+        }),
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          textTransform: 'none',
+          borderRadius: theme.shape.borderRadius * 2,
+        }),
+      },
+    },
+  }), []);
 
   // Reset navigation state when location changes
   useEffect(() => {
@@ -164,7 +206,6 @@ function AppContent() {
     }
     return null;
   };
-
   const fetchSimilarSongs = async (song, existingIds = []) => {
     try {
       const artistName =
@@ -248,30 +289,20 @@ function AppContent() {
     }
   }, [queue.length]);
 
-  const handleSongSelect = useCallback(async (song, songs = []) => {
-    if (!song) return;
-    
-    // Don't play music on For You page
-    if (isForYouPage) return;
-
+  const handleSongSelect = useCallback(async (song, queueSongs = []) => {
     // If song is already playing, do nothing
     if (currentTrack?.id === song.id) return;
-
-    // Pause any existing audio before setting new track
-    const audio = document.querySelector('audio');
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
-    }
 
     // Update current track
     setCurrentTrack(song);
 
     // Handle queue management
-    if (songs.length > 0) {
-      const newQueue = songs.filter(s => s.id !== song.id);
+    if (queueSongs.length > 0) {
+      // If queueSongs is provided, use it as the new queue
+      const newQueue = queueSongs.filter(s => s.id !== song.id);
       setQueue(newQueue);
     } else {
+      // If song is not in a playlist, don't create a new queue
       setQueue([]);
     }
 
@@ -290,17 +321,24 @@ function AppContent() {
     } catch (error) {
       console.error('Error fetching lyrics:', error);
     }
+  }, [currentTrack, fetchLyrics]);
 
-    return Promise.resolve(); // Ensure we return a Promise
-  }, [currentTrack, isForYouPage, fetchLyrics]);
-
-  const handleQueueItemClick = useCallback((songs) => {
-    if (Array.isArray(songs)) {
-      setQueue(prevQueue => [...prevQueue, ...songs]);
-    } else {
-      setQueue(prevQueue => [...prevQueue, songs]);
-    }
-  }, []);
+  const handleQueueItemClick = useCallback((song, index) => {
+    if (!song) return;
+    
+    // Remove clicked song and all songs before it from queue
+    const newQueue = queue.slice(index + 1);
+    setQueue(newQueue);
+    
+    // Set the clicked song as current track
+    setCurrentTrack(song);
+    
+    // Add to play history
+    setPlayHistory(prev => {
+      const newHistory = [song, ...prev.filter(s => s.id !== song.id)].slice(0, 50);
+      return newHistory;
+    });
+  }, [queue]);
 
   const handleNext = useCallback(() => {
     if (queue.length === 0) return;
@@ -336,90 +374,106 @@ function AppContent() {
     setQueue(newQueue);
   };
 
+ 
   const handleLogin = (name) => {
     setUsername(name);
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <CssBaseline />
-      
-      {!username ? (
-        <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
-          <Routes>
-            <Route path="/login" element={<Login onLogin={handleLogin} />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Box>
-      ) : (
-        <>
-          <Sidebar appName="MuiX" username={username} />
-          <Box
-            component="main"
-            sx={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              bgcolor: "#121212",
-            }}
-          >
-            <Routes key={navigationKey}>
-              <Route path="/" element={<Home onSongSelect={handleSongSelect} username={username} />} />
-              <Route path="/login" element={<Navigate to="/" replace />} />
-              <Route path="/for-you" element={<ForYou />} />
-              <Route path="/downloads" element={<Downloads />} />
-              <Route path="/library" element={<Library />} />
-              <Route path="/create-playlist" element={<CreatePlaylist />} />
-              <Route path="/search" element={<Search onSongSelect={handleSongSelect} />} />
-              <Route path="/playlist/:url" element={<Playlist onSongSelect={handleSongSelect} />} />
-              <Route path="/liked-songs" element={<LikedSongs onSongSelect={handleSongSelect} />} />
-              <Route path="/artist/:id" element={<Artist onSongSelect={handleSongSelect} />} />
-              <Route path="/album/:id" element={<Album onSongSelect={handleSongSelect} />} />
-              <Route path="/top-artists" element={<TopArtists />} />
-              <Route path="/following" element={<Following />} />
-              <Route path="/top-playlists" element={<TopPlaylists />} />
-              <Route path="/playlist/top/:id" element={<TopPlaylistDetails onSongSelect={handleSongSelect} />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+    <MuiThemeProvider 
+      theme={createTheme({
+        ...theme,
+        components: {
+          ...theme.components,
+          ...componentOverrides
+        }
+      })}
+    >
+      <Box sx={{ 
+        display: 'flex', 
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        color: 'text.primary'
+      }}>
+        <CssBaseline />
+        
+        {!username ? (
+          <Box component="main" sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            <Routes>
+              <Route path="/login" element={<Login onLogin={handleLogin} />} />
+              <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </Box>
-
-          {/* Bottom Navigation for Mobile */}
-          {isMobile && !isForYouPage && <BottomNav />}
-
-          {/* Audio Players */}
-          {!isDownloadsActive && !isForYouPage && (
-            <Box sx={{ pb: 7 }}>
-              <ErrorBoundary>
-                <Player
-                  currentTrack={currentTrack}
-                  onNext={handleNext}
-                  onPrevious={handlePrevious}
-                  hasNext={queue.length > 0}
-                  hasPrevious={playHistory.length > 0}
-                  queue={queue}
-                  onQueueItemClick={handleQueueItemClick}
-                  onReorderQueue={handleReorderQueue}
-                />
-              </ErrorBoundary>
+        ) : (
+          <>
+            <Sidebar appName="MuiX" username={username} />
+            <Box
+              component="main"
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                bgcolor: 'background.default',
+              }}
+            >
+              <Routes key={navigationKey}>
+                <Route path="/" element={<Home onSongSelect={handleSongSelect} username={username} />} />
+                <Route path="/login" element={<Navigate to="/" replace />} />
+                <Route path="/for-you" element={<ForYou />} />
+                <Route path="/downloads" element={<Downloads />} />
+                <Route path="/library" element={<Library />} />
+                <Route path="/create-playlist" element={<CreatePlaylist />} />
+                <Route path="/search" element={<Search onSongSelect={handleSongSelect} />} />
+                <Route path="/playlist/:playlistId" element={<Playlist onSongSelect={handleSongSelect} />} />
+                <Route path="/liked-songs" element={<LikedSongs onSongSelect={handleSongSelect} />} />
+                <Route path="/artist/:id" element={<Artist onSongSelect={handleSongSelect} />} />
+                <Route path="/album/:id" element={<Album onSongSelect={handleSongSelect} />} />
+                <Route path="/top-artists" element={<TopArtists />} />
+                <Route path="/following" element={<Following />} />
+                <Route path="/top-playlists" element={<TopPlaylists />} />
+                <Route path="/playlist/top/:id" element={<TopPlaylistDetails onSongSelect={handleSongSelect} />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
             </Box>
-          )}
-        </>
-      )}
-    </Box>
+
+            {/* Bottom Navigation for Mobile */}
+            {isMobile && !isForYouPage && <BottomNav />}
+
+            {/* Audio Players */}
+            {!isDownloadsActive && !isForYouPage && (
+              <Box sx={{ pb: 7 }}>
+                <ErrorBoundary>
+                  <Player
+                    currentTrack={currentTrack}
+                    onNext={handleNext}
+                    onPrevious={handlePrevious}
+                    hasNext={queue.length > 0}
+                    hasPrevious={playHistory.length > 0}
+                    queue={queue}
+                    onQueueItemClick={handleQueueItemClick}
+                    onReorderQueue={handleReorderQueue}
+                  />
+                </ErrorBoundary>
+              </Box>
+            )}
+          </>
+        )}
+      </Box>
+    </MuiThemeProvider>
   );
 }
 
 function App() {
   return (
     <Router>
-      <ThemeProvider theme={darkTheme}>
-        <SnackbarProvider>
-          <UserPreferencesProvider>
-            <ArtistProvider>
-              <LibraryProvider>
-                <SettingsProvider>
+      <SnackbarProvider>
+        <UserPreferencesProvider>
+          <ArtistProvider>
+            <LibraryProvider>
+              <SettingsProvider>
+                <CustomThemeProvider>
                   <AudioProvider>
                     <DownloadsAudioProvider>
                       <TopPlaylistsProvider>
@@ -427,12 +481,12 @@ function App() {
                       </TopPlaylistsProvider>
                     </DownloadsAudioProvider>
                   </AudioProvider>
-                </SettingsProvider>
-              </LibraryProvider>
-            </ArtistProvider>
-          </UserPreferencesProvider>
-        </SnackbarProvider>
-      </ThemeProvider>
+                </CustomThemeProvider>
+              </SettingsProvider>
+            </LibraryProvider>
+          </ArtistProvider>
+        </UserPreferencesProvider>
+      </SnackbarProvider>
     </Router>
   );
 }

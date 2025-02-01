@@ -1,34 +1,29 @@
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useCallback, useEffect, useState } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import axios from "axios";
 
 const LibraryContext = createContext();
 
 export const LibraryProvider = ({ children }) => {
-  const [playlists, setPlaylists] = useLocalStorage("playlists", []);
+  // Initialize state from localStorage
+  const [storedPlaylists, setStoredPlaylists] = useLocalStorage("playlists", []);
   const [likedSongs, setLikedSongs] = useLocalStorage("likedSongs", []);
+  
+  // Keep a local state for immediate updates
+  const [playlists, setPlaylists] = useState(storedPlaylists);
 
-  // Check if a song is in library
-  const isInLibrary = (song) => {
-    if (!song?.id) return false;
-    return likedSongs.some((likedSong) => likedSong.id === song.id);
-  };
+  // Sync local state with localStorage
+  useEffect(() => {
+    setPlaylists(storedPlaylists);
+  }, [storedPlaylists]);
 
-  // Add song to library
-  const addToLibrary = (song) => {
-    if (!song) return;
-    if (isInLibrary(song)) return;
-    setLikedSongs((prev) => [...prev, song]);
-  };
-
-  // Remove song from library
-  const removeFromLibrary = (song) => {
-    if (!song) return;
-    setLikedSongs((prev) => prev.filter((s) => s.id !== song.id));
-  };
+  // Sync localStorage with local state
+  useEffect(() => {
+    setStoredPlaylists(playlists);
+  }, [playlists, setStoredPlaylists]);
 
   // Create a new playlist
-  const createPlaylist = (name, song = null) => {
+  const createPlaylist = useCallback((name, song = null) => {
     if (!name.trim()) {
       console.error('Playlist name is required');
       return null;
@@ -42,57 +37,120 @@ export const LibraryProvider = ({ children }) => {
       thumbnail: null
     };
 
-    setPlaylists((prev) => [...prev, newPlaylist]);
-    console.log('Created new playlist:', newPlaylist);
+    console.log('Creating playlist:', newPlaylist);
+    
+    setPlaylists(prevPlaylists => {
+      const updatedPlaylists = [...prevPlaylists, newPlaylist];
+      console.log('Updated playlists:', updatedPlaylists);
+      return updatedPlaylists;
+    });
+
     return newPlaylist;
-  };
+  }, []);
 
   // Add a song to a playlist
-  const addToPlaylist = (playlistId, song) => {
+  const addToPlaylist = useCallback((playlistId, song) => {
     if (!song) {
       console.error('No song provided to add to playlist');
-      return;
+      return Promise.reject(new Error('No song provided'));
     }
     
     if (!playlistId) {
       console.error('No playlist ID provided');
-      return;
+      return Promise.reject(new Error('No playlist ID provided'));
+    }
+
+    return new Promise((resolve) => {
+      setPlaylists(prevPlaylists => {
+        const updatedPlaylists = prevPlaylists.map(playlist => {
+          if (playlist.id === playlistId) {
+            // Check if song already exists in playlist
+            if (playlist.songs.some(s => s.id === song.id)) {
+              return playlist;
+            }
+
+            // Create a new playlist with the added song
+            const updatedPlaylist = {
+              ...playlist,
+              songs: [...playlist.songs, song],
+              thumbnail: playlist.thumbnail || song.image?.[2]?.url
+            };
+
+            console.log('Adding song to playlist:', playlistId, 'Updated playlist:', updatedPlaylist);
+            return updatedPlaylist;
+          }
+          return playlist;
+        });
+
+        // Resolve with the updated playlists
+        resolve(updatedPlaylists);
+        return updatedPlaylists;
+      });
+    });
+  }, []);
+
+  // Add multiple songs to a playlist at once
+  const addSongsToPlaylist = useCallback((playlistId, songs) => {
+    if (!Array.isArray(songs) || songs.length === 0) {
+      console.error('No songs provided to add to playlist');
+      return Promise.reject(new Error('No songs provided'));
     }
     
-    setPlaylists((prev) => {
-      const updatedPlaylists = prev.map((playlist) => {
-        if (playlist.id === playlistId) {
-          // Check if song already exists in playlist
-          if (playlist.songs.some(s => s.id === song.id)) {
-            return playlist;
+    if (!playlistId) {
+      console.error('No playlist ID provided');
+      return Promise.reject(new Error('No playlist ID provided'));
+    }
+
+    return new Promise((resolve) => {
+      setPlaylists(prevPlaylists => {
+        const updatedPlaylists = prevPlaylists.map(playlist => {
+          if (playlist.id === playlistId) {
+            // Filter out songs that already exist in the playlist
+            const newSongs = songs.filter(song => 
+              !playlist.songs.some(existingSong => existingSong.id === song.id)
+            );
+
+            if (newSongs.length === 0) {
+              return playlist;
+            }
+
+            // Create a new playlist with all new songs added
+            const updatedPlaylist = {
+              ...playlist,
+              songs: [...playlist.songs, ...newSongs],
+              thumbnail: playlist.thumbnail || newSongs[0]?.image?.[2]?.url
+            };
+
+            console.log('Adding songs to playlist:', playlistId, 'Updated playlist:', updatedPlaylist);
+            return updatedPlaylist;
           }
-          return {
-            ...playlist,
-            songs: [...playlist.songs, song],
-            thumbnail: playlist.thumbnail || song.image?.[2]?.url
-          };
-        }
-        return playlist;
+          return playlist;
+        });
+
+        // Resolve with the updated playlists
+        resolve(updatedPlaylists);
+        return updatedPlaylists;
       });
-      return updatedPlaylists;
     });
-  };
+  }, []);
 
   // Get a playlist by ID
-  const getPlaylist = (playlistId) => {
+  const getPlaylist = useCallback((playlistId) => {
     if (!playlistId) return null;
-    return playlists.find((p) => p.id === playlistId) || null;
-  };
+    console.log('Getting playlist:', playlistId, 'Current playlists:', playlists);
+    const playlist = playlists.find(p => p.id === playlistId);
+    console.log('Found playlist:', playlist);
+    return playlist || null;
+  }, [playlists]);
 
   // Remove a song from a playlist
-  const removeFromPlaylist = (playlistId, songId) => {
-    setPlaylists((prev) =>
-      prev.map((playlist) => {
+  const removeFromPlaylist = useCallback((playlistId, songId) => {
+    setPlaylists(prevPlaylists => {
+      const updatedPlaylists = prevPlaylists.map(playlist => {
         if (playlist.id === playlistId) {
-          const newSongs = playlist.songs.filter((song) => song.id !== songId);
+          const newSongs = playlist.songs.filter(song => song.id !== songId);
           // Update thumbnail if needed
-          const thumbnail =
-            newSongs.length > 0 ? newSongs[0].image?.[2]?.url : null;
+          const thumbnail = newSongs.length > 0 ? newSongs[0].image?.[2]?.url : null;
           return {
             ...playlist,
             songs: newSongs,
@@ -100,36 +158,37 @@ export const LibraryProvider = ({ children }) => {
           };
         }
         return playlist;
-      })
-    );
-  };
+      });
+      return updatedPlaylists;
+    });
+  }, []);
 
   // Delete an entire playlist
-  const deletePlaylist = (playlistId) => {
-    setPlaylists((prev) =>
-      prev.filter((playlist) => playlist.id !== playlistId)
+  const deletePlaylist = useCallback((playlistId) => {
+    setPlaylists(prevPlaylists => 
+      prevPlaylists.filter(playlist => playlist.id !== playlistId)
     );
-  };
+  }, []);
 
   // Like/Unlike a song
-  const toggleLikeSong = (song) => {
+  const toggleLikeSong = useCallback((song) => {
     if (!song) return;
 
-    setLikedSongs((prev) => {
+    setLikedSongs(prev => {
       const isLiked = prev.some((s) => s.id === song.id);
       if (isLiked) {
         return prev.filter((s) => s.id !== song.id);
       }
       return [...prev, { ...song, likedAt: new Date().toISOString() }];
     });
-  };
+  }, [setLikedSongs]);
 
   // Check if a song is liked
-  const isLiked = (songId) => {
+  const isLiked = useCallback((songId) => {
     return likedSongs.some((song) => song.id === songId);
-  };
+  }, [likedSongs]);
 
-  const handleSongSelect = async (song, songs = []) => {
+  const handleSongSelect = useCallback(async (song, songs = []) => {
     if (!song) return;
     try {
       if (!song.downloadUrl?.[0]?.url) {
@@ -191,22 +250,20 @@ export const LibraryProvider = ({ children }) => {
       console.error("Error handling song select:", error);
       alert("Unable to play this song. Please try another.");
     }
-  };
+  }, []);
 
   const value = {
     playlists,
     likedSongs,
     createPlaylist,
     addToPlaylist,
+    addSongsToPlaylist,
     getPlaylist,
     removeFromPlaylist,
     deletePlaylist,
+    isLiked,
     toggleLikeSong,
     handleSongSelect,
-    isLiked,
-    isInLibrary,
-    addToLibrary,
-    removeFromLibrary
   };
 
   return (

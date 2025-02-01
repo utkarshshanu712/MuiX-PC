@@ -15,7 +15,7 @@ class ErrorBoundary extends React.Component {
     // Auto refresh after 1 second when an error occurs
     setTimeout(() => {
       window.location.reload();
-    }, 1000000);
+    }, 1000);
   }
 
   render() {

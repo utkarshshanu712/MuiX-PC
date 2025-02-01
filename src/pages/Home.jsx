@@ -1223,78 +1223,83 @@ const QuickPicks = ({ onSongSelect }) => {
   };
 
   return (
-    <Box sx={{ width: '100%', mb: 4, bgcolor: '#121212' }}>
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        mb: 2,
-        px: { xs: 1, sm: 2 },
-        py: 1
-      }}>
-        <Typography 
-          variant="h6" 
-          sx={{ 
-            fontWeight: 'bold', 
-            color: '#fff',
-            fontSize: { xs: '1.1rem', sm: '1.25rem' }
+    <Box sx={{ width: "100%", mb: 4,borderRadius:"15px", bgcolor: "#8b8686fa" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 2,
+          px: { xs: 1, sm: 2 },
+          py: 1,
+        }}
+      >
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: "bold",
+            color: "#fff",
+            fontSize: { xs: "1.1rem", sm: "1.25rem" },
           }}
         >
           Quick Picks
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           <Button
             onClick={handlePlayAll}
             disabled={quickPicks.length === 0}
             sx={{
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              color: '#fff',
-              fontSize: '0.875rem',
-              textTransform: 'none',
+              bgcolor: "rgba(255, 255, 255, 0.1)",
+              color: "#fff",
+              fontSize: "0.875rem",
+              textTransform: "none",
               px: 2,
               py: 0.5,
-              minWidth: 'auto',
+              minWidth: "auto",
               borderRadius: 1,
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
+              "&:hover": {
+                bgcolor: "rgba(255, 255, 255, 0.2)",
               },
-              '&.Mui-disabled': {
-                color: 'rgba(255, 255, 255, 0.3)',
-                bgcolor: 'rgba(255, 255, 255, 0.05)'
-              }
+              "&.Mui-disabled": {
+                color: "rgba(255, 255, 255, 0.3)",
+                bgcolor: "rgba(255, 255, 255, 0.05)",
+              },
             }}
           >
             Play all
           </Button>
-          <IconButton 
+          <IconButton
             onClick={handlePrevPage}
             disabled={currentPage === 0}
-            sx={{ 
-              color: '#fff',
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' },
+            sx={{
+              color: "#fff",
+              bgcolor: "rgba(255, 255, 255, 0.1)",
+              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.2)" },
               p: 0.5,
               ml: 1,
-              '&.Mui-disabled': {
-                color: 'rgba(255, 255, 255, 0.3)',
-                bgcolor: 'rgba(255, 255, 255, 0.05)'
-              }
+              "&.Mui-disabled": {
+                color: "rgba(255, 255, 255, 0.3)",
+                bgcolor: "rgba(255, 255, 255, 0.05)",
+              },
             }}
           >
             <ChevronLeft />
           </IconButton>
-          <IconButton 
+          <IconButton
             onClick={handleNextPage}
-            disabled={currentPage >= Math.ceil(quickPicks.length / currentItemsPerPage) - 1}
-            sx={{ 
-              color: '#fff',
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' },
+            disabled={
+              currentPage >=
+              Math.ceil(quickPicks.length / currentItemsPerPage) - 1
+            }
+            sx={{
+              color: "#fff",
+              bgcolor: "rgba(255, 255, 255, 0.1)",
+              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.2)" },
               p: 0.5,
-              '&.Mui-disabled': {
-                color: 'rgba(255, 255, 255, 0.3)',
-                bgcolor: 'rgba(255, 255, 255, 0.05)'
-              }
+              "&.Mui-disabled": {
+                color: "rgba(255, 255, 255, 0.3)",
+                bgcolor: "rgba(255, 255, 255, 0.05)",
+              },
             }}
           >
             <ChevronRight />
@@ -1302,58 +1307,77 @@ const QuickPicks = ({ onSongSelect }) => {
         </Box>
       </Box>
 
-      <Grid 
-        container 
+      <Grid
+        container
         spacing={1.5}
-        sx={{ 
+        sx={{
           px: { xs: 1, sm: 2 },
-          '& .MuiGrid-item': {
-            maxWidth: { xs: '50%', sm: '50%', md: '25%' },
-            flexBasis: { xs: '50%', sm: '50%', md: '25%' }
-          }
+          "& .MuiGrid-item": {
+            maxWidth: { xs: "50%", sm: "50%", md: "25%" },
+            flexBasis: { xs: "50%", sm: "50%", md: "25%" },
+          },
         }}
       >
         {isLoading ? (
-          Array(isMobile ? 6 : 8).fill(0).map((_, index) => (
-            <Grid item xs={6} sm={6} md={3} key={index}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: { xs: 1, sm: 1.5 },
-                  bgcolor: 'rgba(32, 32, 32, 0.9)',
-                  borderRadius: 1,
-                  p: { xs: 0.75, sm: 1 },
-                  height: { xs: '60px', sm: '72px' }
-                }}
-              >
+          Array(isMobile ? 6 : 8)
+            .fill(0)
+            .map((_, index) => (
+              <Grid item xs={6} sm={6} md={3} key={index}>
                 <Box
                   sx={{
-                    width: { xs: '40px', sm: '56px' },
-                    height: { xs: '40px', sm: '56px' },
+                    display: "flex",
+                    alignItems: "center",
+                    gap: { xs: 1, sm: 1.5 },
+                    bgcolor: "rgba(32, 32, 32, 0.9)",
                     borderRadius: 1,
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+                    p: { xs: 0.75, sm: 1 },
+                    height: { xs: "60px", sm: "72px" },
                   }}
                 >
-                  <CircularProgress size={20} />
+                  <Box
+                    sx={{
+                      width: { xs: "40px", sm: "56px" },
+                      height: { xs: "40px", sm: "56px" },
+                      borderRadius: 1,
+                      bgcolor: "rgba(255, 255, 255, 0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <CircularProgress size={20} />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Box
+                      sx={{
+                        height: 10,
+                        width: "70%",
+                        bgcolor: "rgba(255, 255, 255, 0.1)",
+                        borderRadius: 1,
+                        mb: 1,
+                      }}
+                    />
+                    <Box
+                      sx={{
+                        height: 8,
+                        width: "50%",
+                        bgcolor: "rgba(255, 255, 255, 0.1)",
+                        borderRadius: 1,
+                      }}
+                    />
+                  </Box>
                 </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Box sx={{ height: 10, width: '70%', bgcolor: 'rgba(255, 255, 255, 0.1)', borderRadius: 1, mb: 1 }} />
-                  <Box sx={{ height: 8, width: '50%', bgcolor: 'rgba(255, 255, 255, 0.1)', borderRadius: 1 }} />
-                </Box>
-              </Box>
-            </Grid>
-          ))
+              </Grid>
+            ))
         ) : quickPicks.length === 0 ? (
           <Grid item xs={12}>
-            <Box sx={{ 
-              textAlign: 'center', 
-              py: 4,
-              color: 'rgba(255, 255, 255, 0.7)'
-            }}>
+            <Box
+              sx={{
+                textAlign: "center",
+                py: 4,
+                color: "rgba(255, 255, 255, 0.7)",
+              }}
+            >
               <Typography>Loading recommendations...</Typography>
             </Box>
           </Grid>
@@ -1361,75 +1385,88 @@ const QuickPicks = ({ onSongSelect }) => {
           visiblePicks.slice(0, isMobile ? 6 : 8).map((song, index) => (
             <Grid item xs={6} sm={6} md={3} key={song.id || index}>
               <Box
-                onClick={() => handleSongClick(song, currentPage * currentItemsPerPage + index)}
+                onClick={() =>
+                  handleSongClick(
+                    song,
+                    currentPage * currentItemsPerPage + index
+                  )
+                }
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
+                  display: "flex",
+                  alignItems: "center",
                   gap: { xs: 1, sm: 2 },
-                  bgcolor: 'rgba(32, 32, 32, 0.9)',
+                  bgcolor: "rgba(32, 32, 32, 0.9)",
                   borderRadius: 1,
                   p: { xs: 0.75, sm: 1.5 },
-                  height: { xs: '60px', sm: '80px' },
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  '&:hover': {
-                    bgcolor: 'rgba(48, 48, 48, 0.9)',
+                  height: { xs: "60px", sm: "80px" },
+                  cursor: "pointer",
+                  transition: "background-color 0.2s",
+                  "&:hover": {
+                    bgcolor: "rgba(48, 48, 48, 0.9)",
                   },
                 }}
               >
                 <Box
                   sx={{
-                    width: { xs: '40px', sm: '64px' },
-                    height: { xs: '40px', sm: '64px' },
+                    width: { xs: "40px", sm: "64px" },
+                    height: { xs: "40px", sm: "64px" },
                     borderRadius: 1,
-                    overflow: 'hidden',
+                    overflow: "hidden",
                     flexShrink: 0,
-                    bgcolor: 'rgba(0, 0, 0, 0.2)'
+                    bgcolor: "rgba(0, 0, 0, 0.2)",
                   }}
                 >
                   <img
-                    src={song.image?.[2]?.url || song.image?.[1]?.url || song.image?.[0]?.url || song.image}
+                    src={
+                      song.image?.[2]?.url ||
+                      song.image?.[1]?.url ||
+                      song.image?.[0]?.url ||
+                      song.image
+                    }
                     alt={song.name}
                     style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      display: 'block'
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
                     }}
                     onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/64?text=Music';
+                      e.target.src =
+                        "https://via.placeholder.com/64?text=Music";
                     }}
                   />
                 </Box>
-                <Box sx={{ 
-                  overflow: 'hidden',
-                  flex: 1,
-                  minWidth: 0
-                }}>
+                <Box
+                  sx={{
+                    overflow: "hidden",
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
                   <Typography
                     variant="body1"
                     sx={{
-                      color: '#fff',
+                      color: "#fff",
                       fontWeight: 500,
-                      fontSize: { xs: '0.7rem', sm: '0.95rem' },
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      mb: { xs: 0.25, sm: 0.75 }
+                      fontSize: { xs: "0.7rem", sm: "0.95rem" },
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      mb: { xs: 0.25, sm: 0.75 },
                     }}
                   >
-                    {(song.name || 'Untitled').length > 15 && isMobile
-                      ? `${song.name.substring(0, 15)}...` 
-                      : (song.name || 'Untitled')}
+                    {(song.name || "Untitled").length > 15 && isMobile
+                      ? `${song.name.substring(0, 15)}...`
+                      : song.name || "Untitled"}
                   </Typography>
                   <Typography
                     variant="body2"
                     sx={{
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontSize: { xs: '0.6rem', sm: '0.85rem' },
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      color: "rgba(255, 255, 255, 0.7)",
+                      fontSize: { xs: "0.6rem", sm: "0.85rem" },
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {getArtistNames(song)}

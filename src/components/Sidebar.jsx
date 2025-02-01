@@ -1,26 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  List, 
-  ListItem, 
-  ListItemIcon, 
-  ListItemText, 
-  Typography, 
-  Divider, 
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+  Divider,
   ListItemButton,
   IconButton,
   Drawer,
   useTheme,
-  useMediaQuery
-} from '@mui/material';
-import { 
-  Home, 
-  Search, 
-  LibraryMusic, 
-  AddBox, 
-  Favorite, 
-  Person, 
-  Language, 
+  useMediaQuery,
+} from "@mui/material";
+import {
+  Home,
+  Search,
+  LibraryMusic,
+  AddBox,
+  Favorite,
+  Person,
+  Language,
   Settings,
   MusicNote as MusicNoteIcon,
   Add,
@@ -37,18 +37,18 @@ import {
   FollowTheSignsTwoTone,
   FavoriteBorder,
   Group,
-  Download
-} from '@mui/icons-material';
-import { Link, useLocation } from 'react-router-dom';
-import { useLibrary } from '../contexts/LibraryContext';
-import { useArtists } from '../contexts/ArtistContext';
+  Download,
+} from "@mui/icons-material";
+import { Link, useLocation } from "react-router-dom";
+import { useLibrary } from "../contexts/LibraryContext";
+import { useArtists } from "../contexts/ArtistContext";
 
 const Sidebar = () => {
   const { likedSongs } = useLibrary();
   const location = useLocation();
   const { topArtists, followedArtists } = useArtists();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleDrawerToggle = () => {
@@ -56,35 +56,36 @@ const Sidebar = () => {
   };
 
   const mainMenuItems = [
-    { text: 'Home', icon: <Home />, path: '/' },
-    { text: 'Top Playlists', icon: <Language />, path: '/top-playlists' },
+    { text: "Home", icon: <Home />, path: "/" },
+    { text: "Top Playlists", icon: <Language />, path: "/top-playlists" },
     // { text: 'For You', icon: <Whatshot />, path: '/for-you' },
-    { text: 'Search', icon: <Search />, path: '/search' },
+    { text: "Search", icon: <Search />, path: "/search" },
   ];
   const playlistItems = [
-    { 
-      text: `Liked Songs (${likedSongs.length})`, 
-      icon: <Favorite />, 
-      path: '/liked-songs' 
+    {
+      text: `Liked Songs (${likedSongs.length})`,
+      icon: <Favorite />,
+      path: "/liked-songs",
     },
-    { text: 'Your Library', icon: <LibraryMusic />, path: '/library' },
-    { text: 'Downloads', icon: <Download />, path: '/downloads' },
+    { text: "Your Library", icon: <LibraryMusic />, path: "/library" },
+    { text: "Downloads", icon: <Download />, path: "/downloads" },
   ];
-  
 
   const exploreItems = [
-    { text: 'Top Artists', icon: <Person />, path: '/top-artists' },
-    { text: 'Following Artists', icon: <Group />, path: '/following' },
-    { text: 'Settings', icon: <Settings />, path: '/settings' },
+    { text: "Top Artists", icon: <Person />, path: "/top-artists" },
+    { text: "Following Artists", icon: <Group />, path: "/following" },
+    { text: "Settings", icon: <Settings />, path: "/settings" },
   ];
 
   const sidebarItemStyle = (isActive) => ({
-    color: 'white',
-    '&:hover': {
-      color: '#1DB954',
+    color: theme.palette.text.primary,
+    "&:hover": {
+      color: theme.palette.primary.main,
+      backgroundColor: theme.palette.action.hover,
     },
     ...(isActive && {
-      color: '#1DB954',
+      color: theme.palette.primary.main,
+      backgroundColor: theme.palette.action.selected,
     }),
   });
 
@@ -98,12 +99,12 @@ const Sidebar = () => {
           to="/"
           sx={{
             mb: 1,
-            color: 'white',
-            textDecoration: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            '&:hover': {
-              color: '#1db954',
+            color: "text.primary",
+            textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+            "&:hover": {
+              color: "primary.main",
             },
           }}
         >
@@ -126,14 +127,14 @@ const Sidebar = () => {
                 ...sidebarItemStyle(location.pathname === item.path),
               }}
             >
-              <ListItemIcon sx={{ color: 'inherit' }}>{item.icon}</ListItemIcon>
+              <ListItemIcon sx={{ color: "inherit" }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
           </ListItem>
         ))}
       </List>
 
-      <Divider sx={{ my: 1, bgcolor: 'rgba(255, 255, 255, 0.1)' }} />
+      <Divider sx={{ my: 1, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
 
       <List>
         {playlistItems.map((item) => (
@@ -149,14 +150,14 @@ const Sidebar = () => {
                 ...sidebarItemStyle(location.pathname === item.path),
               }}
             >
-              <ListItemIcon sx={{ color: 'inherit' }}>{item.icon}</ListItemIcon>
+              <ListItemIcon sx={{ color: "inherit" }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
           </ListItem>
         ))}
       </List>
 
-      <Divider sx={{ my: 2, bgcolor: 'rgba(255, 255, 255, 0.1)' }} />
+      <Divider sx={{ my: 2, bgcolor: "rgba(255, 255, 255, 0.1)" }} />
 
       <List>
         {exploreItems.map((item) => (
@@ -172,7 +173,7 @@ const Sidebar = () => {
                 ...sidebarItemStyle(location.pathname === item.path),
               }}
             >
-              <ListItemIcon sx={{ color: 'inherit' }}>{item.icon}</ListItemIcon>
+              <ListItemIcon sx={{ color: "inherit" }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
           </ListItem>
@@ -191,13 +192,13 @@ const Sidebar = () => {
           edge="start"
           onClick={handleDrawerToggle}
           sx={{
-            position: 'fixed',
+            position: "fixed",
             top: 10,
             left: 10,
             zIndex: 1200,
-            bgcolor: 'rgba(0, 0, 0, 0.5)',
-            '&:hover': {
-              bgcolor: 'rgba(0, 0, 0, 0.7)',
+            bgcolor: "rgba(0, 0, 0, 0.5)",
+            "&:hover": {
+              bgcolor: "rgba(0, 0, 0, 0.7)",
             },
           }}
         >
@@ -223,11 +224,12 @@ const Sidebar = () => {
               keepMounted: true, // Better mobile performance
             }}
             sx={{
-              display: { xs: 'block', sm: 'none' },
-              '& .MuiDrawer-paper': {
-                boxSizing: 'border-box',
+              display: { xs: "block", sm: "none" },
+              "& .MuiDrawer-paper": {
+                boxSizing: "border-box",
                 width: 240,
-                bgcolor: '#121212',
+                bgcolor: theme.palette.background.paper,
+                borderRight: `1px solid ${theme.palette.divider}`,
               },
             }}
           >
@@ -237,12 +239,12 @@ const Sidebar = () => {
           <Drawer
             variant="permanent"
             sx={{
-              display: { xs: 'none', sm: 'block' },
-              '& .MuiDrawer-paper': {
-                boxSizing: 'border-box',
+              display: { xs: "none", sm: "block" },
+              "& .MuiDrawer-paper": {
+                boxSizing: "border-box",
                 width: 240,
-                bgcolor: '#121212',
-                border: 'none',
+                bgcolor: theme.palette.background.paper,
+                borderRight: `1px solid ${theme.palette.divider}`,
               },
             }}
             open

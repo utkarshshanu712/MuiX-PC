@@ -297,6 +297,18 @@ const ExpandedPlayer = ({
     setSleepTimerAnchor(null);
   };
 
+  // Helper function to get the best available image URL
+  const getImageUrl = (track) => {
+    if (!track) return '/default-song.png';
+    
+    // Try different image sources in order of preference
+    return track.thumbnail || 
+           track.coverUrl || 
+           (track.image?.[0]?.link) || 
+           (track.image?.[2]?.url) ||
+           '/default-song.png';
+  };
+
   return (
     <Drawer
       anchor="bottom"
@@ -361,7 +373,7 @@ const ExpandedPlayer = ({
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
           }}>
             <img
-              src={currentTrack.image?.[2]?.url || currentTrack.image?.[1]?.url || currentTrack.image?.[0]?.url}
+              src={getImageUrl(currentTrack)}
               alt={currentTrack.name}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
